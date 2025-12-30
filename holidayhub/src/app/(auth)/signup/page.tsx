@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { auth, db } from "@/lib/firebase";
+import { db, auth } from "@/firebase/config";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import Link from "next/link";
@@ -19,7 +19,7 @@ export default function SignupPage() {
       email,
       role: "customer",
     });
-    router.push("/(customer)/profile");
+    router.push("/profile");
   };
 
   return (
@@ -44,7 +44,7 @@ export default function SignupPage() {
           Sign Up
         </button>
       </form>
-      <Link href="/(auth)/joinasvendor" className="mt-4 text-blue-600 underline">
+      <Link href="/joinasvendor" className="mt-4 text-blue-600 underline">
         Sign up as Vendor
       </Link>
     </main>

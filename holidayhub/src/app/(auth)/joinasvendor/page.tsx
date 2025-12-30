@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { auth, db } from "@/lib/firebase";
+import { db, auth } from "@/firebase/config";
 import { doc, updateDoc, setDoc } from "firebase/firestore";
 
 export default function JoinAsVendorPage() {
@@ -18,7 +18,7 @@ export default function JoinAsVendorPage() {
       businessName,
       createdAt: new Date(),
     });
-    router.push("/(vendor)/dashboard");
+    router.push("/dashboard");
   };
 
   return (

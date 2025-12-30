@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { auth, db } from "@/lib/firebase";
+import { db, auth } from "@/firebase/config";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 
@@ -17,9 +17,9 @@ export default function LoginPage() {
     const snap = await getDoc(doc(db, "users", userCred.user.uid));
     const role = snap.data()?.role;
     if (role === "vendor") {
-      router.push("/(vendor)/dashboard");
+      router.push("/dashboard");
     } else {
-      router.push("/(customer)/profile");
+      router.push("/profile");
     }
   };
 

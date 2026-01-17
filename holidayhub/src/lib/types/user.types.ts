@@ -1,48 +1,48 @@
 export type UserRole = 'customer' | 'vendor' | 'admin';
 
-export interface BaseUser {
-  id: string;
+export interface UserData {
+  uid: string;
   email: string;
   name: string;
+  role: UserRole;
   phone?: string;
-  avatar?: string;
+  businessName?: string;
   createdAt: Date;
-  updatedAt: Date;
 }
 
-export interface Customer extends BaseUser {
-  role: 'customer';
-  bookings: string[]; // Array of booking IDs
-  wishlist: string[]; // Array of package/activity IDs
+export interface CustomerProfile {
+  userId: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  dateOfBirth?: Date;
+  profileImage?: string;
   preferences?: {
     destinations: string[];
-    activityTypes: string[];
-    budgetRange?: {
+    activities: string[];
+    budgetRange: {
       min: number;
       max: number;
     };
   };
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-export interface Vendor extends BaseUser {
-  role: 'vendor';
+export interface VendorProfile {
+  userId: string;
   businessName: string;
-  businessDescription?: string;
+  contactPerson: string;
+  email: string;
+  phone: string;
+  businessType: 'tour-operator' | 'activity-provider' | 'both';
+  registrationNumber?: string;
   businessAddress?: string;
-  businessPhone?: string;
-  businessEmail?: string;
+  profileImage?: string;
   businessLogo?: string;
-  businessDocuments?: string[]; // URLs to uploaded docs
-  isVerified: boolean;
+  description?: string;
   rating?: number;
-  totalBookings: number;
-  packageIds: string[];
-  activityIds: string[];
+  totalBookings?: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
-
-export interface Admin extends BaseUser {
-  role: 'admin';
-  permissions: string[];
-}
-
-export type User = Customer | Vendor | Admin;

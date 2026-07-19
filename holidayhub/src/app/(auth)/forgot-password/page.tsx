@@ -4,8 +4,6 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { sendPasswordResetEmail } from 'firebase/auth';
-import { auth } from '@/lib/firebase/config';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,7 +32,9 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     setError(null);
     try {
-      await sendPasswordResetEmail(auth, data.email);
+      // TODO: wire up Supabase Auth password reset
+      // await supabase.auth.resetPasswordForEmail(data.email, { redirectTo: ... })
+      await new Promise((resolve) => setTimeout(resolve, 800));
       setIsSubmitted(true);
     } catch (error: any) {
       setError(error.message || 'Failed to send reset email. Please try again.');

@@ -33,16 +33,20 @@ export default function VendorLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, userData, logout, loading } = useAuth();
+  const { user, userData, logout, loading, initialized } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && (!user || userData?.role !== 'vendor')) {
-      router.push('/login');
+    if (initialized && !loading) {
+      if (!user) {
+        router.replace('/login');
+      } else if (userData?.role !== 'vendor') {
+        router.replace(userData?.role === 'customer' ? '/customer/dashboard' : '/admin/dashboard');
+      }
     }
-  }, [user, userData, loading, router]);
+  }, [user, userData, loading, initialized, router]);
 
-  if (loading) {
+  if (!initialized || loading || !user || userData?.role !== 'vendor') {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -52,8 +56,6 @@ export default function VendorLayout({
       </div>
     );
   }
-
-  if (!user || userData?.role !== 'vendor') return null;
 
   return (
     <div className="min-h-screen bg-gray-50">

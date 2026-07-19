@@ -1,6 +1,6 @@
 import { useEffect, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { useAuthStore } from '@/lib/store/auth.store';
+import { useAuthStore, dashboardFor } from '@/lib/store/auth.store';
 
 export const useAuth = () => {
   const router = useRouter();
@@ -8,61 +8,69 @@ export const useAuth = () => {
   const {
     user,
     userData,
+    vendorData,
     loading,
+    initialized,
     error,
     login,
     registerCustomer,
-    registerVendor,
+    registerVendorStep1,
+    registerVendorStep2,
+    loginWithGoogle,
     logout,
+    forgotPassword,
     clearError,
+    init,
   } = useAuthStore();
 
-  // Save intended destination
+  // Initialize session (onAuthStateChange) once on mount
+  useEffect(() => {
+    if (!initialized) {
+      init();
+    }
+  }, [initialized, init]);
+
+  // Save intended destination for post-login redirect
   const saveRedirectPath = useCallback(() => {
     if (typeof window !== 'undefined' && pathname) {
-      if (!pathname.includes('/login') && 
-          !pathname.includes('/register') &&
-          !pathname.includes('/forgot-password')) {
+      if (
+        !pathname.includes('/login') &&
+        !pathname.includes('/register') &&
+        !pathname.includes('/forgot-password')
+      ) {
         localStorage.setItem('redirectPath', pathname);
-        console.log('Saved redirect path:', pathname);
       }
     }
   }, [pathname]);
 
-  // Redirect based on role
+  // Redirect to role dashboard after auth on login/register pages
   useEffect(() => {
-    if (userData && (pathname === '/login' || pathname?.includes('/register'))) {
-      const redirectPath = localStorage.getItem('redirectPath') || '/';
-      const role = userData.role;
-      
-      console.log('Attempting redirect. Role:', role, 'Path:', redirectPath);
-      
-      // Small delay to ensure React state updates
-      const timer = setTimeout(() => {
-        if (role === 'customer') {
-          router.push('/customer/dashboard');
-        } else if (role === 'vendor') {
-          router.push('/vendor/dashboard');
-        }
-        
-        // Clear redirect path
-        localStorage.removeItem('redirectPath');
-      }, 500);
-      
-      return () => clearTimeout(timer);
+    if (initialized && userData && (pathname === '/login' || pathname?.includes('/register'))) {
+      const redirectPath = localStorage.getItem('redirectPath');
+      localStorage.removeItem('redirectPath');
+      const destination = redirectPath && !redirectPath.includes('/login') && !redirectPath.includes('/register')
+        ? redirectPath
+        : dashboardFor(userData.role);
+      router.replace(destination);
     }
-  }, [userData, router, pathname]);
+  }, [initialized, userData, pathname, router]);
 
   return {
     user,
     userData,
+    vendorData,
     loading,
+    initialized,
     error,
     login,
     registerCustomer,
-    registerVendor,
+    registerVendorStep1,
+    registerVendorStep2,
+    loginWithGoogle,
     logout,
+    forgotPassword,
     clearError,
+    init,
     saveRedirectPath,
     isAuthenticated: !!user,
     role: userData?.role,

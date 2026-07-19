@@ -2,7 +2,8 @@
 
 import { useAuth } from '@/lib/hooks/use-auth';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { 
   Home, 
   Calendar, 
@@ -18,8 +19,27 @@ export default function CustomerLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { userData, logout } = useAuth();
+  const { user, userData, logout, loading, initialized } = useAuth();
+  const router = useRouter();
   const pathname = usePathname();
+
+  useEffect(() => {
+    if (initialized && !loading) {
+      if (!user) {
+        router.replace('/login');
+      } else if (userData?.role !== 'customer') {
+        router.replace(userData?.role === 'vendor' ? '/vendor/dashboard' : '/admin/dashboard');
+      }
+    }
+  }, [user, userData, loading, initialized, router]);
+
+  if (!initialized || loading || !user || userData?.role !== 'customer') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
+      </div>
+    );
+  }
 
   const navItems = [
     { href: '/customer/bookings', icon: Calendar, label: 'My Bookings' },

@@ -13,7 +13,8 @@ import {
   User,
   MapPin,
   Phone,
-  Mail
+  Mail,
+  ShoppingBag,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/hooks/use-auth';
@@ -57,6 +58,22 @@ export default function CheckoutPage() {
     alert('Booking confirmed! Redirecting to payment...');
     // Implement actual payment logic here
   };
+
+  if (cartItems.length === 0) {
+    return (
+      <div className="container mx-auto flex flex-col items-center justify-center px-4 py-24">
+        <ShoppingBag size={64} className="text-gray-300" />
+        <h2 className="mt-6 text-2xl font-bold text-gray-900">Your cart is empty</h2>
+        <p className="mt-2 text-gray-500">Add some trips or activities before checking out.</p>
+        <Link
+          href="/packages"
+          className="mt-6 inline-flex items-center gap-2 rounded-lg bg-primary-600 px-6 py-3 text-sm font-medium text-white hover:bg-primary-700"
+        >
+          Browse Packages
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getListing, type ListingView } from "@/lib/supabase/listing";
 import { ListingBookingWidget } from "@/components/browse/listing-booking-widget";
+import { ListingReviews } from "@/components/browse/listing-reviews";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,9 @@ export default async function ListingDetailPage({
           <div className="lg:w-2/3">
             <ListingHero listing={listing} />
             <ListingDetails listing={listing} />
+            <div className="mt-8">
+              <ListingReviews listingId={listing.id} listingType={listing.type} />
+            </div>
           </div>
           <div className="lg:w-1/3">
             <div className="sticky top-24">

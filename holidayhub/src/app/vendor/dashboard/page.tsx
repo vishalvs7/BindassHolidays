@@ -2,7 +2,6 @@
 
 import { 
   TrendingUp, 
-  Users, 
   CreditCard, 
   Star, 
   Calendar, 
@@ -12,11 +11,9 @@ import {
   PlusCircle,
   BarChart3,
   Eye,
-  MessageSquare,
   Download,
   Bell,
   TrendingDown,
-  DollarSign,
   Target,
   CheckCircle,
   XCircle,
@@ -25,144 +22,228 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/hooks/use-auth';
+import { useEffect, useState } from 'react';
+import { getBrowserClient } from '@/lib/supabase/client';
+import { Loader2, AlertCircle } from 'lucide-react';
+
+interface DashboardStats {
+  totalListings: number;
+  publishedListings: number;
+  totalBookings: number;
+  activeBookings: number;
+  totalRevenue: number;
+  avgRating: number | null;
+  totalReviews: number;
+  recentBookings: {
+    id: string;
+    contact_name: string;
+    listing_title: string;
+    listing_type: string;
+    qty: number;
+    total_amount: number;
+    status: string;
+    created_at: string;
+  }[];
+  listingStats: {
+    id: string;
+    title: string;
+    type: string;
+    bookings: number;
+    revenue: number;
+    rating: number;
+  }[];
+}
 
 export default function VendorDashboardPage() {
-  const { userData } = useAuth();
-  
-  // Placeholder stats - will be replaced with real data
-  const stats = [
+  const { user, userData } = useAuth();
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    (async () => {
+      setLoading(true);
+      try {
+        const supabase = getBrowserClient();
+
+        // Listings
+        const { data: listings, error: lErr } = await supabase
+          .from("listings")
+          .select("id, title, type, status, rating")
+          .eq("vendor_id", user.id);
+        if (lErr) throw lErr;
+
+        const totalListings = listings?.length ?? 0;
+        const publishedListings = listings?.filter((l: any) => l.status === "published").length ?? 0;
+
+        // Bookings via batch_slots -> batch_dates -> listings
+        const listingIds = (listings ?? []).map((l: any) => l.id);
+        let bookings: any[] = [];
+        let revenue = 0;
+        if (listingIds.length > 0) {
+          const { data: b, error: bErr } = await supabase
+            .from("bookings")
+            .select("id, listing_id, listing_type, status, total_amount, qty, contact_name, created_at")
+            .in("listing_id", listingIds)
+            .order("created_at", { ascending: false });
+          if (bErr) throw bErr;
+          bookings = b ?? [];
+          revenue = (bookings as any[])
+            .filter((b: any) => b.status !== "cancelled")
+            .reduce((s: number, b: any) => s + Number(b.total_amount), 0);
+        }
+
+        const titleMap = new Map<string, string>((listings ?? []).map((l: any) => [l.id, l.title]));
+
+        // Per-listing stats
+        const listingBookings = new Map<string, { count: number; revenue: number }>();
+        for (const l of listings ?? []) {
+          listingBookings.set(l.id, { count: 0, revenue: 0 });
+        }
+        for (const b of bookings) {
+          const cur = listingBookings.get(b.listing_id) ?? { count: 0, revenue: 0 };
+          cur.count++;
+          if (b.status !== "cancelled") cur.revenue += Number(b.total_amount);
+          listingBookings.set(b.listing_id, cur);
+        }
+
+        const listingStats = (listings ?? []).map((l: any) => {
+          const lb = listingBookings.get(l.id) ?? { count: 0, revenue: 0 };
+          return {
+            id: l.id,
+            title: l.title,
+            type: l.type,
+            bookings: lb.count,
+            revenue: lb.revenue,
+            rating: Number(l.rating ?? 0),
+          };
+        });
+
+        // Average rating from reviews on this vendor's listings
+        let avgRating: number | null = null;
+        let totalReviews = 0;
+        if (listingIds.length > 0) {
+          const { data: reviews } = await supabase
+            .from("reviews")
+            .select("rating")
+            .in("listing_id", listingIds);
+          if (reviews && reviews.length > 0) {
+            totalReviews = reviews.length;
+            avgRating = (reviews as any[]).reduce((s: number, r: any) => s + r.rating, 0) / reviews.length;
+          }
+        }
+
+        const activeBookings = bookings.filter(
+          (b: any) => b.status === "confirmed" || b.status === "pending_payment"
+        ).length;
+
+        const recentBookings = bookings.slice(0, 5).map((b: any) => ({
+          id: b.id,
+          contact_name: b.contact_name,
+          listing_title: titleMap.get(b.listing_id as string) ?? "—",
+          listing_type: b.listing_type,
+          qty: b.qty,
+          total_amount: Number(b.total_amount),
+          status: b.status,
+          created_at: b.created_at,
+        }));
+
+        setStats({
+          totalListings,
+          publishedListings,
+          totalBookings: bookings.length,
+          activeBookings,
+          totalRevenue: revenue,
+          avgRating: avgRating ? Math.round(avgRating * 10) / 10 : null,
+          totalReviews,
+          recentBookings,
+          listingStats: listingStats.sort((a: any, b: any) => b.bookings - a.bookings).slice(0, 4),
+        });
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to load dashboard.");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [user?.id]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20 text-gray-400">
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading dashboard…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center gap-2 rounded-xl bg-red-50 p-4 text-sm text-red-700">
+        <AlertCircle className="h-4 w-4" /> {error}
+      </div>
+    );
+  }
+
+  const dashStats = [
     { 
       title: 'Total Revenue', 
-      value: '₹0', 
+      value: `₹${(stats?.totalRevenue ?? 0).toLocaleString('en-IN')}`, 
       change: '+0%', 
-      changeType: 'increase',
+      changeType: 'increase' as const,
       icon: CreditCard, 
       color: 'bg-green-100 text-green-600',
-      subtitle: 'This month'
+      subtitle: 'All time'
     },
     { 
       title: 'Active Bookings', 
-      value: '0', 
-      change: '+0%', 
-      changeType: 'increase',
+      value: String(stats?.activeBookings ?? 0), 
+      change: `${stats?.totalBookings ?? 0} total`, 
+      changeType: 'increase' as const,
       icon: Calendar, 
       color: 'bg-blue-100 text-blue-600',
       subtitle: 'Currently active'
     },
     { 
       title: 'Total Listings', 
-      value: '0', 
-      change: '+0%', 
-      changeType: 'increase',
+      value: String(stats?.totalListings ?? 0), 
+      change: `${stats?.publishedListings ?? 0} published`, 
+      changeType: stats?.publishedListings ? 'increase' as const : 'increase' as const,
       icon: Package, 
       color: 'bg-purple-100 text-purple-600',
       subtitle: 'Packages & activities'
     },
     { 
       title: 'Customer Rating', 
-      value: '--', 
-      change: '+0%', 
-      changeType: 'increase',
+      value: stats?.avgRating ? `${stats.avgRating}` : '--', 
+      change: stats?.totalReviews ? `${stats.totalReviews} reviews` : 'No reviews', 
+      changeType: 'increase' as const,
       icon: Star, 
       color: 'bg-yellow-100 text-yellow-600',
-      subtitle: 'Based on 0 reviews'
+      subtitle: stats?.totalReviews ? `Based on ${stats.totalReviews} reviews` : 'No reviews yet'
     },
   ];
 
-  const recentBookings = [
-    { 
-      id: 1, 
-      customer: 'John Doe', 
-      package: 'Goa Beach Package', 
-      date: '2024-06-15', 
-      amount: '₹24,999', 
-      status: 'confirmed',
-      type: 'package',
-      guests: 2
-    },
-    { 
-      id: 2, 
-      customer: 'Jane Smith', 
-      package: 'Trekking Adventure', 
-      date: '2024-06-18', 
-      amount: '₹8,499', 
-      status: 'pending',
-      type: 'activity',
-      guests: 4
-    },
-    { 
-      id: 3, 
-      customer: 'Bob Wilson', 
-      package: 'Kerala Backwaters', 
-      date: '2024-06-20', 
-      amount: '₹18,500', 
-      status: 'confirmed',
-      type: 'package',
-      guests: 3
-    },
-    { 
-      id: 4, 
-      customer: 'Alice Johnson', 
-      package: 'Desert Safari', 
-      date: '2024-06-22', 
-      amount: '₹12,500', 
-      status: 'cancelled',
-      type: 'package',
-      guests: 2
-    },
-  ];
+  const recentBookings = (stats?.recentBookings ?? []).length > 0
+    ? (stats?.recentBookings ?? [])
+    : [];
 
-  const popularListings = [
-    { 
-      id: 1, 
-      name: 'Luxury Houseboat Stay', 
-      type: 'package', 
-      bookings: 0, 
-      revenue: '₹0',
-      views: 124,
-      rating: 4.8
-    },
-    { 
-      id: 2, 
-      name: 'Paragliding Experience', 
-      type: 'activity', 
-      bookings: 0, 
-      revenue: '₹0',
-      views: 89,
-      rating: 4.9
-    },
-    { 
-      id: 3, 
-      name: 'Desert Safari', 
-      type: 'package', 
-      bookings: 0, 
-      revenue: '₹0',
-      views: 156,
-      rating: 4.5
-    },
-    { 
-      id: 4, 
-      name: 'Mountain Trekking', 
-      type: 'activity', 
-      bookings: 0, 
-      revenue: '₹0',
-      views: 67,
-      rating: 4.7
-    },
-  ];
+  const popularListings = (stats?.listingStats ?? []).length > 0
+    ? (stats?.listingStats ?? [])
+    : [];
 
-  const notifications = [
-    { id: 1, message: 'New booking received for Goa Beach Package', time: '2 hours ago', read: false },
-    { id: 2, message: 'Your listing "Desert Safari" got 5 new views', time: '5 hours ago', read: true },
-    { id: 3, message: 'Payment of ₹24,999 has been processed', time: '1 day ago', read: true },
-    { id: 4, message: 'Customer review received: 5 stars', time: '2 days ago', read: true },
-  ];
+  const notifications: {
+    id: number;
+    message: string;
+    time: string;
+    read: boolean;
+  }[] = [];
 
   const getStatusIcon = (status: string) => {
     switch(status) {
       case 'confirmed': return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'pending': return <Clock className="h-4 w-4 text-yellow-500" />;
+      case 'pending_payment': return <Clock className="h-4 w-4 text-yellow-500" />;
       case 'cancelled': return <XCircle className="h-4 w-4 text-red-500" />;
+      case 'completed': return <CheckCircle className="h-4 w-4 text-blue-500" />;
       default: return null;
     }
   };
@@ -170,8 +251,9 @@ export default function VendorDashboardPage() {
   const getStatusColor = (status: string) => {
     switch(status) {
       case 'confirmed': return 'bg-green-100 text-green-800 border-green-200';
-      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'pending_payment': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
+      case 'completed': return 'bg-blue-100 text-blue-800 border-blue-200';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -200,7 +282,7 @@ export default function VendorDashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => {
+        {dashStats.map((stat, index) => {
           const Icon = stat.icon;
           return (
             <div key={index} className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
@@ -259,35 +341,35 @@ export default function VendorDashboardPage() {
                   {recentBookings.map((booking) => (
                     <tr key={booking.id} className="hover:bg-gray-50">
                       <td className="px-4 py-4">
-                        <div className="font-medium text-gray-900">{booking.customer}</div>
-                        <div className="text-sm text-gray-500">{booking.guests} guests</div>
+                        <div className="font-medium text-gray-900">{booking.contact_name}</div>
+                        <div className="text-sm text-gray-500">{booking.qty} guest{booking.qty > 1 ? "s" : ""}</div>
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center">
                           <div className={`h-8 w-8 rounded-lg flex items-center justify-center mr-3 ${
-                            booking.type === 'package' ? 'bg-purple-100' : 'bg-blue-100'
+                            booking.listing_type === 'package' ? 'bg-purple-100' : 'bg-blue-100'
                           }`}>
-                            {booking.type === 'package' ? (
-                              <Package size={16} className={booking.type === 'package' ? 'text-purple-600' : 'text-blue-600'} />
+                            {booking.listing_type === 'package' ? (
+                              <Package size={16} className={booking.listing_type === 'package' ? 'text-purple-600' : 'text-blue-600'} />
                             ) : (
-                              <Activity size={16} className={booking.type === 'package' ? 'text-purple-600' : 'text-blue-600'} />
+                              <Activity size={16} className={booking.listing_type === 'package' ? 'text-purple-600' : 'text-blue-600'} />
                             )}
                           </div>
-                          <span className="font-medium text-gray-900 truncate max-w-[120px]">{booking.package}</span>
+                          <span className="font-medium text-gray-900 truncate max-w-[120px]">{booking.listing_title}</span>
                         </div>
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-900">
-                        {new Date(booking.date).toLocaleDateString('en-IN', { 
+                        {new Date(booking.created_at).toLocaleDateString('en-IN', { 
                           day: 'numeric', 
                           month: 'short' 
                         })}
                       </td>
-                      <td className="px-4 py-4 font-semibold text-gray-900">{booking.amount}</td>
+                      <td className="px-4 py-4 font-semibold text-gray-900">₹{booking.total_amount.toLocaleString('en-IN')}</td>
                       <td className="px-4 py-4">
                         <div className="flex items-center">
                           {getStatusIcon(booking.status)}
-                          <span className={`ml-2 px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(booking.status)}`}>
-                            {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                          <span className={`ml-2 px-3 py-1 rounded-full text-xs font-medium border capitalize ${getStatusColor(booking.status)}`}>
+                            {booking.status.replace("_", " ")}
                           </span>
                         </div>
                       </td>
@@ -343,12 +425,16 @@ export default function VendorDashboardPage() {
                         )}
                       </div>
                       <div>
-                        <h4 className="font-medium text-gray-900">{listing.name}</h4>
+                        <h4 className="font-medium text-gray-900">{listing.title}</h4>
                         <div className="flex items-center text-sm text-gray-500 mt-1">
                           <Eye size={12} className="mr-1" />
-                          {listing.views} views
-                          <Star size={12} className="ml-3 mr-1" />
-                          {listing.rating}/5
+                          {listing.bookings} booking{listing.bookings > 1 ? "s" : ""}
+                          {listing.rating > 0 && (
+                            <>
+                              <Star size={12} className="ml-3 mr-1" />
+                              {listing.rating}/5
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -365,11 +451,11 @@ export default function VendorDashboardPage() {
                     </div>
                     <div>
                       <div className="text-sm text-gray-600">Revenue</div>
-                      <div className="font-semibold">{listing.revenue}</div>
+                      <div className="font-semibold">₹{listing.revenue.toLocaleString('en-IN')}</div>
                     </div>
-                    <button className="text-primary-600 hover:text-primary-700 text-sm font-medium">
+                    <Link href={`/vendor/listings/${listing.type}s/edit/${listing.id}`} className="text-primary-600 hover:text-primary-700 text-sm font-medium">
                       Edit
-                    </button>
+                    </Link>
                   </div>
                 </div>
               ))}

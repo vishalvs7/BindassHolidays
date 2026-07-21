@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { HOME_TABS } from '@/config/tabs';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import {
   Sparkles,
   ShieldCheck,
@@ -16,8 +18,8 @@ import {
   Mountain,
   Plane,
   Heart,
-  CalendarDays,
   Building,
+  Search,
 } from 'lucide-react';
 
 // ---------- Mock data (backend not wired yet) ----------
@@ -64,6 +66,15 @@ function Carousel({ children }: { children: React.ReactNode }) {
 }
 
 export default function HomePage() {
+  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState('');
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const q = searchQuery.trim();
+    if (q) router.push(`/packages?q=${encodeURIComponent(q)}`);
+  }
+
   return (
     <div className="min-h-screen bg-white">
       {/* ===== 500px Hero Banner ===== */}
@@ -86,23 +97,20 @@ export default function HomePage() {
             Zero corporate leaves. Zero planning.
           </p>
 
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link href="/packages">
-              <Button size="lg" className="bg-white px-8 py-6 text-lg text-primary-700 hover:bg-gray-100">
-                <Compass className="mr-2 h-5 w-5" /> Explore Weekend Trips
-              </Button>
-            </Link>
-            {/* Disabled — custom itinerary coming later */}
-            <Button
-              size="lg"
-              variant="outline"
-              disabled
-              className="cursor-not-allowed border-white/60 px-8 py-6 text-lg text-white/70 hover:bg-transparent"
-              title="Coming soon"
-            >
-              <CalendarDays className="mr-2 h-5 w-5" /> Custom Itinerary (soon)
-            </Button>
-          </div>
+          <form onSubmit={handleSearch} className="mx-auto mt-6 flex w-full max-w-lg items-center">
+            <div className="relative flex w-full items-center">
+              <div className="absolute left-0 z-10 flex h-full items-center rounded-l-full bg-purple-600 px-4">
+                <Search className="h-5 w-5 text-white" />
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search destinations, activities, vibes…"
+                className="w-full rounded-full border border-white/30 bg-transparent py-3.5 pl-14 pr-4 text-sm text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/40"
+              />
+            </div>
+          </form>
         </div>
       </section>
 

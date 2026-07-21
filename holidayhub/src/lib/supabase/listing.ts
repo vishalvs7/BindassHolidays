@@ -143,6 +143,7 @@ export interface ListingFilters {
   minPrice?: number;
   maxPrice?: number;
   minDuration?: number;
+  q?: string;
 }
 
 export async function getListings(filters: ListingFilters = {}): Promise<ListingCardView[]> {
@@ -162,6 +163,10 @@ export async function getListings(filters: ListingFilters = {}): Promise<Listing
   if (filters.minPrice != null) query = query.gte("price", filters.minPrice);
   if (filters.maxPrice != null) query = query.lte("price", filters.maxPrice);
   if (filters.minDuration != null) query = query.gte("duration_days", filters.minDuration);
+  if (filters.q) {
+    const q = `%${filters.q}%`;
+    query = query.or(`title.ilike.${q},summary.ilike.${q},destination.ilike.${q},tags.cs.{${filters.q}}`);
+  }
 
   const { data, error } = await query.order("created_at", { ascending: false }).limit(60);
   if (error || !data) return [];

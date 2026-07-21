@@ -22,7 +22,7 @@ export function PackagesGrid({ packages }: { packages: ListingCardView[] }) {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 lg:gap-6">
       {packages.map((p) => (
         <Link
           key={p.id}

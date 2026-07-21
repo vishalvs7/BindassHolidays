@@ -1,7 +1,14 @@
 import type { Metadata } from 'next';
+import { Nova_Round } from 'next/font/google';
 import './globals.css';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
+
+const novaRound = Nova_Round({
+  weight: '400',
+  subsets: ['latin'],
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'Bindass Holiday - Multi-Vendor Travel Platform',
@@ -15,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="font-sans">
+      <body className={novaRound.className}>
         <Header />
         <main className="min-h-screen">{children}</main>
         <Footer />

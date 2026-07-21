@@ -37,16 +37,26 @@ export default function VendorPaymentsPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                 </tr></thead>
                 <tbody className="divide-y divide-gray-200">
-                  {transactions.map((tx) => (
-                    <tr key={tx.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4"><div className="flex items-center"><Calendar size={14} className="mr-2" />{tx.date}</div></td>
-                      <td className="px-6 py-4 font-medium text-gray-900">{tx.description}</td>
-                      <td className="px-6 py-4"><span className={`px-3 py-1 rounded-full text-xs font-medium ${tx.type === 'booking' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>{tx.type}</span></td>
-                      <td className="px-6 py-4 font-semibold text-gray-900">{tx.amount}</td>
-                      <td className="px-6 py-4"><span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${tx.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                        {tx.status === 'paid' ? <CheckCircle size={12} className="mr-1" /> : <Clock size={12} className="mr-1" />}{tx.status}</span></td>
+                  {transactions.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-16 text-center">
+                        <CreditCard size={40} className="mx-auto text-gray-300" />
+                        <p className="mt-3 font-semibold text-gray-900">No transactions yet</p>
+                        <p className="mt-1 text-sm text-gray-500">Payments from bookings will appear here once customers start booking.</p>
+                      </td>
                     </tr>
-                  ))}
+                  ) : (
+                    transactions.map((tx) => (
+                      <tr key={tx.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4"><div className="flex items-center"><Calendar size={14} className="mr-2" />{tx.date}</div></td>
+                        <td className="px-6 py-4 font-medium text-gray-900">{tx.description}</td>
+                        <td className="px-6 py-4"><span className={`px-3 py-1 rounded-full text-xs font-medium ${tx.type === 'booking' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>{tx.type}</span></td>
+                        <td className="px-6 py-4 font-semibold text-gray-900">{tx.amount}</td>
+                        <td className="px-6 py-4"><span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${tx.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                          {tx.status === 'paid' ? <CheckCircle size={12} className="mr-1" /> : <Clock size={12} className="mr-1" />}{tx.status}</span></td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

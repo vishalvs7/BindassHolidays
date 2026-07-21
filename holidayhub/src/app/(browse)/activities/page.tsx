@@ -3,6 +3,8 @@ import { HOME_TABS, resolveTab } from "@/config/tabs";
 import { getListings, type ListingFilters } from "@/lib/supabase/listing";
 import { PackagesGrid } from "@/components/browse/packages-grid";
 import { PackagesFilterSidebar } from "@/components/browse/packages-filter-sidebar";
+import { SearchBar } from "@/components/browse/search-bar";
+import { MobileFilterDrawer } from "@/components/browse/mobile-filter-drawer";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +13,7 @@ export default async function ActivitiesPage({
 }: {
   searchParams: Promise<{
     cat?: string;
+    q?: string;
     tag?: string;
     vertical?: string;
     destination?: string;
@@ -25,6 +28,7 @@ export default async function ActivitiesPage({
 
   const filters: ListingFilters = {
     type: "activity",
+    q: sp.q,
     tag: sp.tag,
     vertical: sp.vertical,
     destination: sp.destination,
@@ -42,6 +46,7 @@ export default async function ActivitiesPage({
 
   const packages = await getListings(filters);
   const activeCat = sp.cat ?? "";
+  const query = sp.q ?? "";
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -55,15 +60,17 @@ export default async function ActivitiesPage({
         </div>
       </div>
 
-      <div className="container mx-auto max-w-6xl px-4 py-8">
+      <div className="mx-auto w-full max-w-[1500px] px-4 py-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">
-            {tab ? `${tab.label} Activities` : "All Activities"}
+            {query ? `Results for "${query}"` : tab ? `${tab.label} Activities` : "All Activities"}
           </h1>
           <p className="mt-2 text-gray-500">
-            {packages.length} {packages.length === 1 ? "activity" : "activities"} available
+            {packages.length} {packages.length === 1 ? "activity" : "activities"} found
           </p>
         </div>
+
+        <SearchBar initialQuery={query} />
 
         <div className="mb-6 flex flex-wrap gap-2">
           <Link
@@ -96,9 +103,16 @@ export default async function ActivitiesPage({
         </div>
 
         <div className="flex flex-col gap-8 lg:flex-row">
-          <PackagesFilterSidebar />
+          <div className="hidden lg:block lg:w-64 lg:flex-shrink-0">
+            <PackagesFilterSidebar />
+          </div>
 
           <div className="flex-1">
+            <div className="mb-4 flex items-center justify-between">
+              <MobileFilterDrawer>
+                <PackagesFilterSidebar />
+              </MobileFilterDrawer>
+            </div>
             <PackagesGrid packages={packages} />
           </div>
         </div>

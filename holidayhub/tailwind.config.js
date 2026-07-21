@@ -6,6 +6,11 @@ module.exports = {
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
+    container: {
+      center: true,
+      padding: '1rem',
+      screens: { '2xl': '1500px' },
+    },
     extend: {
       colors: {
         // Purple theme colors (your preference)
@@ -49,8 +54,8 @@ module.exports = {
         'destructive-foreground': '#ffffff',
       },
       fontFamily: {
-        sans: ['Poppins', 'system-ui', 'sans-serif'],
-        heading: ['Poppins', 'system-ui', 'sans-serif'],
+        sans: ['Nova Round', 'system-ui', 'sans-serif'],
+        heading: ['Nova Round', 'system-ui', 'sans-serif'],
         mono: ['ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       borderRadius: {

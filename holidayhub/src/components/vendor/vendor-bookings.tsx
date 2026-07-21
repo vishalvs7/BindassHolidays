@@ -14,6 +14,7 @@ import {
   ChevronRight,
   CheckCircle2,
   Clock,
+  XCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { ListingKind } from "@/lib/supabase/listing";
@@ -47,6 +48,7 @@ export function VendorBookings({ type }: { type?: ListingKind }) {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [updating, setUpdating] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -115,6 +117,24 @@ export function VendorBookings({ type }: { type?: ListingKind }) {
       }
     })();
   }, [user?.id, type]);
+
+  async function handleStatusUpdate(bookingId: string, newStatus: string) {
+    setUpdating(bookingId);
+    try {
+      const res = await fetch(`/api/booking/${bookingId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error ?? "Update failed.");
+      setRows((prev) => prev.map((r) => (r.id === bookingId ? { ...r, status: newStatus } : r)));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to update booking status.");
+    } finally {
+      setUpdating(null);
+    }
+  }
 
   const filtered = useMemo(
     () => (statusFilter === "all" ? rows : rows.filter((r) => r.status === statusFilter)),
@@ -254,6 +274,53 @@ export function VendorBookings({ type }: { type?: ListingKind }) {
                       )}
                     </div>
                   </div>
+
+                  {/* Status actions */}
+                  {(r.status === "pending_payment" || r.status === "confirmed") && (
+                    <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-gray-200 pt-4">
+                      {r.status === "pending_payment" && (
+                        <button
+                          onClick={() => handleStatusUpdate(r.id, "confirmed")}
+                          disabled={updating === r.id}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                          {updating === r.id ? (
+                            <Loader2 size={15} className="animate-spin" />
+                          ) : (
+                            <CheckCircle2 size={15} />
+                          )}
+                          Confirm booking
+                        </button>
+                      )}
+                      {r.status === "confirmed" && (
+                        <button
+                          onClick={() => handleStatusUpdate(r.id, "completed")}
+                          disabled={updating === r.id}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                          {updating === r.id ? (
+                            <Loader2 size={15} className="animate-spin" />
+                          ) : (
+                            <CheckCircle2 size={15} />
+                          )}
+                          Mark completed
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleStatusUpdate(r.id, "cancelled")}
+                        disabled={updating === r.id}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50"
+                      >
+                        {updating === r.id ? (
+                          <Loader2 size={15} className="animate-spin" />
+                        ) : (
+                          <XCircle size={15} />
+                        )}
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+
                   <div className="mt-4 flex justify-end">
                     <Link
                       href={`/listings/${r.listing_id}`}

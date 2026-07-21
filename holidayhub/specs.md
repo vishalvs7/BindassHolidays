@@ -91,7 +91,7 @@ This consistency keeps ground logistics clean, makes marketing laser-targeted, a
 
 ---
 
-## 📌 Build Status & Progress (Last updated: 2026-07-20)
+## 📌 Build Status & Progress (Last updated: 2026-07-21)
 
 > **This is the resume point for the next dev session.** Read this section to know exactly where to start.
 
@@ -99,6 +99,7 @@ This consistency keeps ground logistics clean, makes marketing laser-targeted, a
 - **Next.js 15.5.4** (downgraded from 16 — Next 16's native runtime caused SIGBUS/silent death in this sandbox), React 19.2.1, Tailwind v3, Shadcn-style UI, Supabase (`@supabase/ssr` + `@supabase/supabase-js`), Zustand, React Hook Form + Zod v4, **Razorpay v2.9.5** (lazy/optional — keys NOT set in `.env.local`). Firebase fully removed.
 - **Verification method:** `tsc --noEmit` (clean) + `next build` (passes). `next dev` CANNOT run in this sandbox (background process gets killed) — do not rely on it; use build + live Supabase queries.
 - `.env.local` holds Supabase anon + service-role keys. `.env*` gitignored. Supabase project ref `crspmjiehmqofjikurkn`.
+- **Font:** `Nova Round` via `next/font/google` (replaced Poppins). All headings `uppercase`.
 
 ### Database migrations applied & verified live
 - `0001_auth_foundation` + `0002_fix_admin_rls` — `profiles`, `vendors`, `is_admin()`.
@@ -106,6 +107,7 @@ This consistency keeps ground logistics clean, makes marketing laser-targeted, a
 - `0004_bookings_reviews` — `bookings` (NULLABLE user_id, listing_id + listing_type FK), `booking_travelers`, `reviews`; RLS.
 - `0005_unify_listings` — single **`listings`** table (type enum `package`|`activity`), dropped packages/activities, re-pointed batch_dates + bookings to listing_id/listing_type, recreated RLS.
 - `0006_fix_slot_policy` — recreated `batch_slots_vendor_all` policy on `listing_id`.
+- `0007_vendor_update_booking` — vendor `UPDATE` policy on `bookings` (via batch_slots → batch_dates → listings join).
 - **IMPORTANT:** `bookings` has NO `booking_count` column — never select it. Booking count is computed client-side by counting rows.
 
 ### Catalog decision (locked)
@@ -113,35 +115,61 @@ This consistency keeps ground logistics clean, makes marketing laser-targeted, a
 
 ### Completed features
 1. **Auth** — customers browse WITHOUT login; shared login → role redirect. Guest checkout (contact + optional password auto-creates customer). Vendor = 2-step. Admin = placeholders. Google = placeholder.
-2. **Dynamic browse** — `src/config/tabs.ts` (From/Vibe taxonomy), `src/lib/supabase/listing.ts` (`getListing(id)`, `getListings(filters)` over `listings`), `components/browse/packages-grid.tsx` (3-col, links to `/listings/[id]`), `components/browse/packages-filter-sidebar.tsx` (From/Vibe/Duration/Price URL filters). Home has dual tab rows → `/packages?cat=...`.
-3. **Unified product page** — `src/app/(browse)/listings/[id]/page.tsx` + `components/browse/listing-booking-widget.tsx` (type-aware). `/packages/[id]` & `/activities/[id]` = redirects to `/listings/[id]`.
-4. **Guest checkout** — `src/app/checkout/page.tsx` + `components/checkout/checkout-form.tsx` (3 steps: contact+optional password, per-traveler details, pay), GST calc, trust badge.
-5. **Booking API** — `src/app/api/booking/route.ts`: validates slot availability, holds slots, optional customer registration, Razorpay lazy (graceful if no keys). Stores `listing_id` + `listing_type`. Verified live (booking + travelers insert).
-6. **Vendor listing management (FULL CRUD)** —
+2. **Dynamic browse** — `src/config/tabs.ts` (From/Vibe taxonomy), `src/lib/supabase/listing.ts` (`getListing(id)`, `getListings(filters)` over `listings`), `components/browse/packages-grid.tsx` (2-col mobile / 3-col desktop), `components/browse/packages-filter-sidebar.tsx` (From/Vibe/Duration/Price URL filters). Home has dual tab rows → `/packages?cat=...`.
+3. **Search & filtering** — `getListings()` supports `q` keyword search (title, summary, destination, tags). `components/browse/search-bar.tsx` with purple search icon. `/packages?q=...` param wired on packages & activities pages.
+4. **Unified product page** — `src/app/(browse)/listings/[id]/page.tsx` + `components/browse/listing-booking-widget.tsx` (type-aware). `/packages/[id]` & `/activities/[id]` = redirects to `/listings/[id]`.
+5. **Guest checkout** — `src/app/checkout/page.tsx` + `components/checkout/checkout-form.tsx` (3 steps: contact+optional password, per-traveler details, pay), GST calc, trust badge.
+6. **Booking API** — `src/app/api/booking/route.ts`: validates slot availability, holds slots, optional customer registration, Razorpay lazy (graceful if no keys). Stores `listing_id` + `listing_type`. Verified live (booking + travelers insert).
+7. **Vendor listing management (FULL CRUD)** —
    - `components/vendor/listing-form.tsx` — unified create/edit form (all sections; supports `initialId` for edit: prefills via browser client, updates + reconciles batches by delete/reinsert). Verified live (insert + update).
    - Routes: `/vendor/listings/new`, `/packages/new`, `/activities/new` (preset type); `/vendor/listings/{packages,activities}/edit/[id]` (edit); bare `edit/` pages redirect to list.
    - `components/vendor/vendor-listings-table.tsx` (used by `/vendor/listings/packages` & `/activities`) — live fetch by vendor_id+type, status toggle (Draft/Published), edit, delete, view. Verified live (update/list/delete).
-7. **Vendor bookings view (just completed)** —
+8. **Vendor bookings view** —
    - `components/vendor/vendor-bookings.tsx` — fetch vendor's listing IDs → bookings via `listing_id` (+ optional `type` filter); summary cards (total/pending/confirmed/revenue), status filter pills, expandable rows with lead contact + **traveler manifest** from `booking_travelers`.
-   - Routes: `/vendor/bookings`, `/vendor/bookings/packages` (type=package), `/vendor/bookings/activities` (type=activity). Replaced the old ComingSoon stubs. Verified: tsc clean, build passes.
-8. **UI primitives** — `components/ui/card.tsx`, `components/ui/badge.tsx` created. `src/types/razorpay.d.ts` ambient decl.
-9. **Config** — `next.config.ts` `outputFileTracingRoot: import.meta.dirname`; `eslint.config.mjs` FlatCompat + overrides (no-unescaped-entities, no-empty-object-type, no-explicit-any as warnings; `prefer-const` is an ERROR — must fix).
+   - Routes: `/vendor/bookings`, `/vendor/bookings/packages`, `/vendor/bookings/activities`.
+9. **Booking status actions** —
+   - `0007_vendor_update_booking` migration adds vendor update RLS policy.
+   - `src/app/api/booking/[id]/route.ts` PATCH endpoint with validated status transitions (pending_payment → confirmed/cancelled, confirmed → completed/cancelled).
+   - Action buttons in expanded booking row (Confirm / Mark Completed / Cancel) with loading states.
+10. **Reviews on listing page** —
+    - `components/browse/listing-reviews.tsx` — fetches & displays reviews by listing_id, star ratings, comment list, average rating.
+    - Submit form with interactive star selector, name field (guests) or auto-name (logged-in), optimistic UI update.
+    - Added to `src/app/(browse)/listings/[id]/page.tsx`.
+11. **Vendor dashboard** — replaced all hardcoded placeholder stats with live Supabase queries:
+    - Stats cards: total revenue, active bookings, total listings, average rating.
+    - Recent bookings table from actual `bookings` table.
+    - Top listings section with booking counts & revenue.
+    - Loading spinner, error state, empty states.
+12. **Navbar** — 3 centered nav items: Explore, Retreat (wellness), Solo Travel (solo_explorer). Uppercase, no icons, active state highlight.
+13. **Mobile responsive** —
+    - Filter sidebar: hidden on mobile, opens as bottom-sheet drawer via `components/browse/mobile-filter-drawer.tsx`.
+    - Grid: 2 columns mobile, 3 columns desktop.
+    - Content max-width: 1500px via Tailwind container config.
+14. **Empty states across the app** —
+    - `loading.tsx` + `error.tsx` for `(browse)` route group.
+    - Cart checkout: empty cart guard with CTA.
+    - Vendor payments: empty transactions state.
+    - Vendor bookings, package grid, reviews all have empty states.
+15. **UI primitives** — `components/ui/card.tsx`, `components/ui/badge.tsx` created. `src/types/razorpay.d.ts` ambient decl.
+16. **Config** — `next.config.ts` `outputFileTracingRoot: import.meta.dirname`; `eslint.config.mjs` FlatCompat + overrides; Tailwind container center + 1500px max-width.
 
 ### Known gaps / blocked
 - Razorpay keys NOT set → payment shows "pending_payment, configure Razorpay" (by design).
-- **Reviews UI not built** (table exists; no submission form or display on listing page).
-- **Vendor dashboard** stats not built (could pull from bookings + listings).
-- Booking **status actions** (vendor marking confirmed/completed) not built.
+- **No Razorpay webhook** — no `payment.captured` endpoint to flip booking to `confirmed`.
+- **No refund/cancellation logic** — cancelling just updates DB status; doesn't release slots or process refunds.
+- **Admin dashboard** — all placeholders / ComingSoon stubs.
+- **Vendor dashboard** notifications panel shows empty state (no real notification system).
 - Automated manifest PDF / WhatsApp / Thursday cron (Phase 4) not built.
 - `package-booking-widget.tsx` is now unused (superseded by `listing-booking-widget.tsx`); safe to delete later.
 
 ### 🚀 Resume checklist for next session
-- [ ] **Reviews section** on public listing page (`/listings/[id]`) — read `reviews` table (by listing_id), add submit form (customer-only or guest).
-- [ ] **Vendor dashboard** stats — total listings, published count, total bookings, revenue from `bookings`/`listings`.
-- [ ] **Booking status actions** — vendor can mark confirmed/completed/cancelled.
-- [ ] Wire **Razorpay live keys** + `payment.captured` webhook verification (updates booking status, releases hold).
-- [ ] (Optional cleanup) delete unused `package-booking-widget.tsx`.
+- [ ] **Vendor dashboard** — polish & add missing widgets (notifications, analytics charts)
+- [ ] **Admin dashboard** — build with real data (total users, vendors, listings, revenue, platform stats)
+- [ ] Polish website UI — refine homepage, listing cards, typography, spacing consistency
+- [ ] Wire **Razorpay live keys** + `payment.captured` webhook verification (updates booking to `confirmed`)
+- [ ] **Cancellation/refund flow** — release slots on cancel, process Razorpay refunds
+- [ ] (Optional cleanup) delete unused `package-booking-widget.tsx`
 
 ---
 
-*Status: Core transaction loop + full vendor CRUD + bookings view COMPLETE & verified. Remaining: reviews UI, vendor dashboard, booking status actions, Razorpay webhook, Phase-4 automation.*
+*Status: Core transaction loop, full vendor CRUD, bookings view, status actions, reviews, vendor dashboard, search, mobile responsive all COMPLETE & verified. Next: Razorpay webhook, admin dashboard, cancellation/refund, UI polish.*

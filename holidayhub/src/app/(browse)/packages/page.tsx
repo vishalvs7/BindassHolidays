@@ -3,6 +3,9 @@ import { HOME_TABS, resolveTab } from "@/config/tabs";
 import { getListings, type ListingFilters } from "@/lib/supabase/listing";
 import { PackagesGrid } from "@/components/browse/packages-grid";
 import { PackagesFilterSidebar } from "@/components/browse/packages-filter-sidebar";
+import { SearchBar } from "@/components/browse/search-bar";
+import { MobileFilterDrawer } from "@/components/browse/mobile-filter-drawer";
+
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +14,7 @@ export default async function PackagesPage({
 }: {
   searchParams: Promise<{
     cat?: string;
+    q?: string;
     tag?: string;
     vertical?: string;
     destination?: string;
@@ -25,6 +29,7 @@ export default async function PackagesPage({
 
   const filters: ListingFilters = {
     type: "package",
+    q: sp.q,
     tag: sp.tag,
     vertical: sp.vertical,
     destination: sp.destination,
@@ -42,6 +47,7 @@ export default async function PackagesPage({
 
   const packages = await getListings(filters);
   const activeCat = sp.cat ?? "";
+  const query = sp.q ?? "";
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -55,17 +61,34 @@ export default async function PackagesPage({
         </div>
       </div>
 
-      <div className="container mx-auto max-w-6xl px-4 py-8">
+      <div className="mx-auto w-full max-w-[1500px] px-4 py-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">
-            {tab ? `${tab.label} Weekend Trips` : "All Weekend Trips"}
+            {query
+              ? `Results for "${query}"`
+              : tab
+              ? `${tab.label} Weekend Trips`
+              : sp.vertical === "wellness"
+              ? "Retreat — Wellness & Spiritual Trips"
+              : sp.vertical === "solo_explorer"
+              ? "Solo Travel — Adventures for One"
+              : "Explore All Weekend Trips"}
           </h1>
           <p className="mt-2 text-gray-500">
-            {packages.length} {packages.length === 1 ? "trip" : "trips"} available
+            {packages.length} {packages.length === 1 ? "trip" : "trips"} found
           </p>
         </div>
 
-        {/* Quick vibe chips (kept from home tabs) */}
+        <SearchBar initialQuery={query} />
+
+        {/* Mobile nav for verticals */}
+        <div className="mb-4 flex gap-2 md:hidden">
+          <Link href="/packages" className={`rounded-full border px-4 py-1.5 text-sm font-medium ${!sp.vertical ? "border-primary-600 bg-primary-600 text-white" : "border-gray-300 text-gray-700"}`}>All</Link>
+          <Link href="/packages?vertical=wellness" className={`rounded-full border px-4 py-1.5 text-sm font-medium ${sp.vertical === "wellness" ? "border-primary-600 bg-primary-600 text-white" : "border-gray-300 text-gray-700"}`}>Retreat</Link>
+          <Link href="/packages?vertical=solo_explorer" className={`rounded-full border px-4 py-1.5 text-sm font-medium ${sp.vertical === "solo_explorer" ? "border-primary-600 bg-primary-600 text-white" : "border-gray-300 text-gray-700"}`}>Solo</Link>
+        </div>
+
+        {/* Quick vibe chips */}
         <div className="mb-6 flex flex-wrap gap-2">
           <Link
             href="/packages"
@@ -97,9 +120,16 @@ export default async function PackagesPage({
         </div>
 
         <div className="flex flex-col gap-8 lg:flex-row">
-          <PackagesFilterSidebar />
+          <div className="hidden lg:block lg:w-64 lg:flex-shrink-0">
+            <PackagesFilterSidebar />
+          </div>
 
           <div className="flex-1">
+            <div className="mb-4 flex items-center justify-between">
+              <MobileFilterDrawer>
+                <PackagesFilterSidebar />
+              </MobileFilterDrawer>
+            </div>
             <PackagesGrid packages={packages} />
           </div>
         </div>

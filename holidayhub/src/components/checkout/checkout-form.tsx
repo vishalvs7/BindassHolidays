@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import type { TravelerInput } from "@/lib/types/booking.types";
+import { loadRazorpayScript, openRazorpayCheckout } from "@/lib/razorpay/client";
 
 interface CheckoutProps {
   listing: {
@@ -44,9 +45,18 @@ export function CheckoutForm({ listing, batch, qty, gstPercent }: CheckoutProps)
   const [travelers, setTravelers] = useState<TravelerInput[]>(
     Array.from({ length: qty }, () => ({ full_name: "", age: "", phone: "", gender: "" }))
   );
+  const [couponCode, setCouponCode] = useState("");
+  const [couponDiscount, setCouponDiscount] = useState<number | null>(null);
+  const [couponBearer, setCouponBearer] = useState<string | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [couponApplied, setCouponApplied] = useState(false);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ bookingId: string; razorpay: unknown } | null>(null);
+  const [done, setDone] = useState<{ bookingId: string; razorpay: unknown; verified?: boolean } | null>(null);
+
+  const finalTotal = couponDiscount ? total - couponDiscount : total;
+  const savings = couponDiscount || 0;
 
   const updateTraveler = (i: number, patch: Partial<TravelerInput>) =>
     setTravelers((prev) => prev.map((t, idx) => (idx === i ? { ...t, ...patch } : t)));
@@ -56,6 +66,40 @@ export function CheckoutForm({ listing, batch, qty, gstPercent }: CheckoutProps)
   const travelersValid = travelers.every(
     (t) => t.full_name.trim() && Number(t.age) > 0 && t.gender !== ""
   );
+
+  async function applyCoupon() {
+    if (!couponCode.trim()) return;
+    setValidatingCoupon(true);
+    setCouponError(null);
+    try {
+      const res = await fetch("/api/coupon/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: couponCode.trim(), orderAmount: total, userEmail: lead.email }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setCouponDiscount(data.discountAmount);
+        setCouponBearer(data.discountBearer);
+        setCouponApplied(true);
+      } else {
+        setCouponError(data.error || "Invalid coupon");
+        setCouponDiscount(null);
+        setCouponApplied(false);
+      }
+    } catch {
+      setCouponError("Failed to validate coupon.");
+    } finally {
+      setValidatingCoupon(false);
+    }
+  }
+
+  function removeCoupon() {
+    setCouponCode("");
+    setCouponDiscount(null);
+    setCouponApplied(false);
+    setCouponError(null);
+  }
 
   async function submit() {
     setSubmitting(true);
@@ -77,16 +121,49 @@ export function CheckoutForm({ listing, batch, qty, gstPercent }: CheckoutProps)
             gender: t.gender || undefined,
           })),
           registerPassword: lead.password ? lead.password : undefined,
+          couponCode: couponApplied ? couponCode.trim().toUpperCase() : undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || "Booking failed.");
-      setDone({ bookingId: data.bookingId, razorpay: data.razorpay ?? null });
-      // If Razorpay is configured, this is where you'd open the checkout modal.
-      // For now we confirm the booking flow completed.
+
+      if (data.razorpay) {
+        const loaded = await loadRazorpayScript();
+        if (!loaded) throw new Error("Failed to load payment gateway.");
+
+        openRazorpayCheckout({
+          key: data.razorpay.key,
+          amount: data.razorpay.amount,
+          currency: data.razorpay.currency,
+          orderId: data.razorpay.orderId,
+          name: "HolidayHub",
+          description: listing.title,
+          contactEmail: lead.email,
+          contactPhone: lead.phone,
+          onSuccess: async (paymentId, orderId, signature) => {
+            const verifyRes = await fetch("/api/razorpay/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                order_id: orderId,
+                payment_id: paymentId,
+                signature,
+                booking_id: data.bookingId,
+              }),
+            });
+            const verifyData = await verifyRes.json();
+            setDone({ bookingId: data.bookingId, razorpay: data.razorpay, verified: verifyData.ok });
+          },
+          onError: (err) => {
+            setError(err);
+            setSubmitting(false);
+          },
+        });
+      } else {
+        setDone({ bookingId: data.bookingId, razorpay: null });
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
-    } finally {
       setSubmitting(false);
     }
   }
@@ -97,11 +174,21 @@ export function CheckoutForm({ listing, batch, qty, gstPercent }: CheckoutProps)
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-green-600">
           <CheckCircle2 className="h-8 w-8" />
         </div>
-        <h2 className="text-xl font-bold text-gray-900">Booking request received</h2>
+        <h2 className="text-xl font-bold text-gray-900">
+          {done.verified ? "Payment Successful!" : done.razorpay ? "Payment received" : "Booking request received"}
+        </h2>
         <p className="mt-2 text-sm text-gray-500">
           Booking ID: <span className="font-mono">{done.bookingId}</span>
         </p>
-        {!done.razorpay && (
+        {done.verified ? (
+          <p className="mt-3 rounded-lg bg-green-50 p-3 text-sm text-green-700">
+            Your booking is <strong>confirmed</strong>. A confirmation email with trip details is on the way.
+          </p>
+        ) : done.razorpay ? (
+          <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-700">
+            Payment was received but signature verification failed. Please contact support with your booking ID.
+          </p>
+        ) : (
           <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-700">
             Payment gateway is not configured yet. The booking is saved in{" "}
             <strong>pending payment</strong> state and will be confirmed once Razorpay is connected.
@@ -210,7 +297,7 @@ export function CheckoutForm({ listing, batch, qty, gstPercent }: CheckoutProps)
             </div>
             <Button className="mt-4 w-full" disabled={submitting} onClick={submit}>
               {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {submitting ? "Processing…" : `Pay ₹${total.toLocaleString()} & Book`}
+              {submitting ? "Processing…" : `Pay ₹${finalTotal.toLocaleString('en-IN')} & Book`}
             </Button>
             <button className="mt-3 text-sm text-gray-500 hover:text-gray-700" onClick={() => setStep(2)}>
               ← Edit traveler details
@@ -231,10 +318,44 @@ export function CheckoutForm({ listing, batch, qty, gstPercent }: CheckoutProps)
               Departs {new Date(batch.departAt).toLocaleString()}
             </p>
           )}
+          {/* Coupon */}
+          <div className="mt-4 border-t border-gray-100 pt-4">
+            {couponApplied ? (
+              <div className="flex items-center justify-between rounded-lg bg-green-50 px-3 py-2 text-sm">
+                <div>
+                  <span className="font-medium text-green-700">Coupon applied</span>
+                  <p className="text-xs text-green-600">-₹{savings.toLocaleString('en-IN')} {couponBearer === 'platform' ? '(covered by HolidayHub)' : ''}</p>
+                </div>
+                <button onClick={removeCoupon} className="text-xs text-green-600 underline">Remove</button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value)}
+                  placeholder="Coupon code"
+                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-500"
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), applyCoupon())}
+                />
+                <button
+                  onClick={applyCoupon}
+                  disabled={validatingCoupon || !couponCode.trim()}
+                  className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+                >
+                  {validatingCoupon ? '…' : 'Apply'}
+                </button>
+              </div>
+            )}
+            {couponError && <p className="mt-1 text-xs text-red-600">{couponError}</p>}
+          </div>
+
           <div className="mt-4 space-y-2 border-t border-gray-100 pt-4 text-sm">
             <div className="flex justify-between"><span className="text-gray-600">Base</span><span>₹{base.toLocaleString()}</span></div>
             <div className="flex justify-between"><span className="text-gray-600">GST ({gstPercent}%)</span><span>₹{gst.toLocaleString()}</span></div>
-            <div className="flex justify-between border-t border-gray-100 pt-2 text-base font-semibold"><span>Total</span><span>₹{total.toLocaleString()}</span></div>
+            {savings > 0 && (
+              <div className="flex justify-between text-green-600"><span>Discount</span><span>-₹{savings.toLocaleString('en-IN')}</span></div>
+            )}
+            <div className="flex justify-between border-t border-gray-100 pt-2 text-base font-semibold"><span>Total</span><span>₹{finalTotal.toLocaleString('en-IN')}</span></div>
           </div>
           {error && (
             <div className="mt-4 flex items-start gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700">

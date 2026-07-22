@@ -4,13 +4,15 @@ import { useAuth } from '@/lib/hooks/use-auth';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, Users, Calendar, Building2, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Building2, Package, Tag, Settings, LogOut } from 'lucide-react';
 
 const adminNav = [
   { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
   { name: 'Vendors', href: '/admin/vendors', icon: Building2 },
   { name: 'Users', href: '/admin/users', icon: Users },
+  { name: 'Packages', href: '/admin/packages', icon: Package },
   { name: 'Bookings', href: '/admin/bookings', icon: Calendar },
+  { name: 'Coupons', href: '/admin/coupons', icon: Tag },
   { name: 'Settings', href: '/admin/settings', icon: Settings },
 ];
 

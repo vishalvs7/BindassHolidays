@@ -16,6 +16,7 @@ export interface CreateOrderRequest {
   }[];
   // optional: register the lead as a customer (guest checkout if omitted)
   registerPassword?: string;
+  couponCode?: string;
 }
 
 export interface CreateOrderResponse {

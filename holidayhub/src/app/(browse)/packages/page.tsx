@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { HOME_TABS, resolveTab } from "@/config/tabs";
+import { resolveTab } from "@/config/tabs";
 import { getListings, type ListingFilters } from "@/lib/supabase/listing";
 import { PackagesGrid } from "@/components/browse/packages-grid";
 import { PackagesFilterSidebar } from "@/components/browse/packages-filter-sidebar";
@@ -46,7 +46,6 @@ export default async function PackagesPage({
   }
 
   const packages = await getListings(filters);
-  const activeCat = sp.cat ?? "";
   const query = sp.q ?? "";
 
   return (
@@ -80,44 +79,6 @@ export default async function PackagesPage({
         </div>
 
         <SearchBar initialQuery={query} />
-
-        {/* Mobile nav for verticals */}
-        <div className="mb-4 flex gap-2 md:hidden">
-          <Link href="/packages" className={`rounded-full border px-4 py-1.5 text-sm font-medium ${!sp.vertical ? "border-primary-600 bg-primary-600 text-white" : "border-gray-300 text-gray-700"}`}>All</Link>
-          <Link href="/packages?vertical=wellness" className={`rounded-full border px-4 py-1.5 text-sm font-medium ${sp.vertical === "wellness" ? "border-primary-600 bg-primary-600 text-white" : "border-gray-300 text-gray-700"}`}>Retreat</Link>
-          <Link href="/packages?vertical=solo_explorer" className={`rounded-full border px-4 py-1.5 text-sm font-medium ${sp.vertical === "solo_explorer" ? "border-primary-600 bg-primary-600 text-white" : "border-gray-300 text-gray-700"}`}>Solo</Link>
-        </div>
-
-        {/* Quick vibe chips */}
-        <div className="mb-6 flex flex-wrap gap-2">
-          <Link
-            href="/packages"
-            className={`rounded-full border px-4 py-1.5 text-sm font-medium ${
-              activeCat === ""
-                ? "border-primary-600 bg-primary-600 text-white"
-                : "border-gray-300 text-gray-700 hover:border-primary-400"
-            }`}
-          >
-            All
-          </Link>
-          {HOME_TABS.flatMap((r) => r.tabs).map((t) => {
-            const href = `/packages?cat=${t.field === "tag" ? "to" : t.field === "vertical" ? "to" : "from"}:${t.value}`;
-            const active = activeCat === `${t.field === "tag" || t.field === "vertical" ? "to" : "from"}:${t.value}`;
-            return (
-              <Link
-                key={t.value}
-                href={href}
-                className={`rounded-full border px-4 py-1.5 text-sm font-medium ${
-                  active
-                    ? "border-primary-600 bg-primary-600 text-white"
-                    : "border-gray-300 text-gray-700 hover:border-primary-400"
-                }`}
-              >
-                {t.label}
-              </Link>
-            );
-          })}
-        </div>
 
         <div className="flex flex-col gap-8 lg:flex-row">
           <div className="hidden lg:block lg:w-64 lg:flex-shrink-0">

@@ -567,41 +567,54 @@ export default function VendorDashboardPage() {
             <div>
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm font-medium text-gray-900">Monthly Revenue</span>
-                <span className="text-sm text-gray-500">₹0 / ₹1,00,000</span>
+                <span className="text-sm text-gray-500">₹{(stats?.totalRevenue ?? 0).toLocaleString('en-IN')} / ₹1,00,000</span>
               </div>
               <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-primary-600 rounded-full" style={{ width: '0%' }}></div>
+                <div className="h-full bg-primary-600 rounded-full transition-all" style={{ width: `${Math.min((stats?.totalRevenue ?? 0) / 100000 * 100, 100)}%` }}></div>
               </div>
             </div>
             
             <div>
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm font-medium text-gray-900">New Bookings</span>
-                <span className="text-sm text-gray-500">0 / 10</span>
+                <span className="text-sm text-gray-500">{stats?.totalBookings ?? 0} / 10</span>
               </div>
               <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-green-500 rounded-full" style={{ width: '0%' }}></div>
+                <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${Math.min((stats?.totalBookings ?? 0) / 10 * 100, 100)}%` }}></div>
               </div>
             </div>
             
             <div>
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm font-medium text-gray-900">Listings Created</span>
-                <span className="text-sm text-gray-500">0 / 5</span>
+                <span className="text-sm text-gray-500">{stats?.totalListings ?? 0} / 5</span>
               </div>
               <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-purple-500 rounded-full" style={{ width: '0%' }}></div>
+                <div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${Math.min((stats?.totalListings ?? 0) / 5 * 100, 100)}%` }}></div>
               </div>
             </div>
             
             <div className="pt-6 border-t border-gray-200">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <Target className="h-5 w-5 text-gray-400 mr-2" />
-                  <span className="text-sm text-gray-600">Overall Progress</span>
-                </div>
-                <span className="text-lg font-bold text-gray-900">0%</span>
-              </div>
+              {(() => {
+                const revenuePct = Math.min((stats?.totalRevenue ?? 0) / 100000, 1);
+                const bookingsPct = Math.min((stats?.totalBookings ?? 0) / 10, 1);
+                const listingsPct = Math.min((stats?.totalListings ?? 0) / 5, 1);
+                const overall = Math.round((revenuePct + bookingsPct + listingsPct) / 3 * 100);
+                return (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <Target className="h-5 w-5 text-gray-400 mr-2" />
+                        <span className="text-sm text-gray-600">Overall Progress</span>
+                      </div>
+                      <span className="text-lg font-bold text-gray-900">{overall}%</span>
+                    </div>
+                    <div className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div className="h-full bg-primary-600 rounded-full transition-all" style={{ width: `${overall}%` }}></div>
+                    </div>
+                  </>
+                );
+              })()}
               <button className="w-full mt-4 px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium">
                 Set New Goals
               </button>

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import type { CreateOrderRequest } from "@/lib/types/payment.types";
+import { sendEmail } from "@/lib/email";
+import { welcomeEmail } from "@/lib/email/templates/welcome";
+import { validateCoupon } from "@/lib/coupon/validate";
+import { couponStore } from "@/lib/coupon/store";
 
 const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
 const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
@@ -40,7 +44,20 @@ async function createBooking(req: CreateOrderRequest) {
   const baseAmount = unitPrice * req.qty;
   const gstPercent = 5;
   const gstAmount = Math.round(baseAmount * gstPercent) / 100;
-  const totalAmount = baseAmount + gstAmount;
+  let totalAmount = baseAmount + gstAmount;
+  let couponInfo: { discountAmount: number; discountBearer: string; code: string } | null = null;
+
+  // 2b. Apply coupon if provided
+  if (req.couponCode) {
+    const result = validateCoupon(req.couponCode, totalAmount, req.contact.email);
+    if (!result.valid) throw new Error(result.error);
+    couponInfo = {
+      discountAmount: result.discountAmount!,
+      discountBearer: result.discountBearer!,
+      code: req.couponCode.toUpperCase(),
+    };
+    totalAmount = result.finalAmount!;
+  }
 
   // 3. Optionally register the lead as a customer (guest if no password)
   let userId: string | null = null;
@@ -58,6 +75,12 @@ async function createBooking(req: CreateOrderRequest) {
       { id: userId, full_name: req.contact.name, email: req.contact.email, role: "customer", phone: req.contact.phone },
       { onConflict: "id" }
     );
+    // send welcome email (non-blocking)
+    sendEmail({
+      to: [{ email: req.contact.email, name: req.contact.name }],
+      subject: "Welcome to HolidayHub!",
+      htmlContent: welcomeEmail(req.contact.name),
+    }).catch((e) => console.error("[booking] Welcome email failed:", e));
   }
 
   // 4. Create booking (pending_payment) + travelers atomically
@@ -100,7 +123,21 @@ async function createBooking(req: CreateOrderRequest) {
     .eq("id", req.batchSlotId);
   if (holdErr) throw new Error("Failed to hold slots.");
 
-  return { bookingId: booking.id, totalAmount };
+  // 6. Track coupon usage
+  if (couponInfo) {
+    const coupon = couponStore.getByCode(couponInfo.code);
+    if (coupon) {
+      couponStore.incrementUsage(coupon.id);
+      couponStore.logUsage({
+        couponId: coupon.id,
+        bookingId: booking.id,
+        userEmail: req.contact.email,
+        discountAmount: couponInfo.discountAmount,
+      });
+    }
+  }
+
+  return { bookingId: booking.id, totalAmount, couponDiscount: couponInfo?.discountAmount };
 }
 
 export async function POST(request: NextRequest) {

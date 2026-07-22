@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Nova_Round } from 'next/font/google';
 import './globals.css';
 import { Header } from '@/components/layout/header';
+import { AnnouncementStrip } from '@/components/layout/announcement-strip';
 import { Footer } from '@/components/layout/footer';
 
 const novaRound = Nova_Round({
@@ -23,6 +24,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={novaRound.className}>
+        <AnnouncementStrip />
         <Header />
         <main className="min-h-screen">{children}</main>
         <Footer />

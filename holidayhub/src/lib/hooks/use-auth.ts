@@ -21,6 +21,8 @@ export const useAuth = () => {
     forgotPassword,
     clearError,
     init,
+    updateProfile,
+    updateVendor,
   } = useAuthStore();
 
   // Initialize session (onAuthStateChange) once on mount
@@ -74,5 +76,7 @@ export const useAuth = () => {
     saveRedirectPath,
     isAuthenticated: !!user,
     role: userData?.role,
+    updateProfile,
+    updateVendor,
   };
 };

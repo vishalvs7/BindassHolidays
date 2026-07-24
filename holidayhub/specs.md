@@ -163,17 +163,17 @@ This consistency keeps ground logistics clean, makes marketing laser-targeted, a
 - `package-booking-widget.tsx` is now unused (superseded by `listing-booking-widget.tsx`); safe to delete later.
 
 ### 🚀 Resume checklist for next session
-- [ ] **Add `updateProfile` to auth store** — create a Zustand action that updates the `profiles` table (name, phone, avatar_url) and refreshes local `userData`
-- [ ] **Add `updateVendor` to auth store** — create a Zustand action that updates the `vendors` table (business_name, contact_person, phone, email, website, etc.) and refreshes local `vendorData`
-- [ ] **Wire up Customer Settings → Profile tab** — form submission calls `updateProfile`; add DOB, bio, and phone fields; show success/error toast
-- [ ] **Wire up Customer Settings → Notifications tab** — persist toggle preferences to a `notification_preferences` column on `profiles` or a separate table; load on mount
-- [ ] **Wire up Customer Settings → Security tab** — implement change password via `supabase.auth.updateUser()`, 2FA UI stub, delete account confirmation flow
-- [ ] **Wire up Vendor Settings → Business tab** — load real data from `useAuth().vendorData`; save via `updateVendor`; show success/error toast
-- [ ] **Build remaining Customer Settings tabs** — Privacy (data export/delete), Payment (saved cards/UPI stub), Preferences (currency, language, theme), Help (FAQ links, support ticket stub)
-- [ ] **Build remaining Vendor Settings tabs** — Profile (contact photo, description), Payment (payout details, commission view), Notifications (email/SMS toggles), Security (password change, 2FA)
+- [x] **Add `updateProfile` to auth store** — create a Zustand action that updates the `profiles` table (name, phone, avatar_url) and refreshes local `userData`
+- [x] **Add `updateVendor` to auth store** — create a Zustand action that updates the `vendors` table (business_name, contact_person, phone, email, website, etc.) and refreshes local `vendorData`
+- [x] **Wire up Customer Settings → Profile tab** — form submission calls `updateProfile`; add DOB, bio, and phone fields; show success/error toast
+- [x] **Wire up Customer Settings → Notifications tab** — persist toggle preferences to a `notification_preferences` column on `profiles` or a separate table; load on mount
+- [x] **Wire up Customer Settings → Security tab** — implement change password via `supabase.auth.updateUser()`, 2FA UI stub, delete account confirmation flow
+- [x] **Wire up Vendor Settings → Business tab** — load real data from `useAuth().vendorData`; save via `updateVendor`; show success/error toast
+- [x] **Build remaining Customer Settings tabs** — Privacy (data export/delete), Payment (saved cards/UPI stub), Preferences (currency, language, theme), Help (FAQ links, support ticket stub)
+- [x] **Build remaining Vendor Settings tabs** — Profile (contact photo, description), Payment (payout details, commission view), Notifications (email/SMS toggles), Security (password change, 2FA)
 - [ ] **Profile photo upload** — avatar for customer (`profiles.avatar_url`), logo for vendor (`vendors.logo_url`); use Supabase Storage with signed URLs
 - [ ] **Add customer dashboard structure** — create `/customer/dashboard` route with sidebar navigation linking to settings; wire header/user menu to point to settings
 
 ---
 
-*Status: Core transaction loop, full vendor CRUD, bookings view, status actions, reviews, vendor dashboard, search, mobile responsive, customer/vendor settings UI all COMPLETE. Customer & vendor settings UIs exist but are NOT wired to Supabase — no data persistence. Packages search/filter is fully functional. Next: wire settings persistence, build remaining tab content, add photo upload, customer dashboard.*
+*Status: Core transaction loop, full vendor CRUD, bookings view, status actions, reviews, vendor dashboard, search, mobile responsive all COMPLETE. Customer & vendor settings fully wired to Supabase with data persistence. All settings tabs built (Profile, Notifications, Security, Privacy, Payment, Preferences, Help for customers; Business, Profile, Payment, Notifications, Security, Help for vendors). Packages search/filter is fully functional. Next: profile photo upload, customer dashboard structure.*

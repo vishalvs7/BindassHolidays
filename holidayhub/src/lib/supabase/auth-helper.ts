@@ -25,6 +25,9 @@ export interface SupabaseVendor {
   banner_url: string | null;
   description: string | null;
   status: 'pending' | 'approved' | 'rejected';
+  bank_account: string | null;
+  upi_id: string | null;
+  notification_preferences: Record<string, boolean> | null;
   created_at: string;
   updated_at: string;
 }

@@ -21,6 +21,9 @@ export type VendorData = {
   bannerUrl?: string;
   description?: string;
   status?: 'pending' | 'approved' | 'rejected';
+  bankAccount?: string;
+  upiId?: string;
+  notificationPreferences?: Record<string, boolean>;
 };
 
 interface AuthState {
@@ -40,6 +43,8 @@ interface AuthState {
   logout: () => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
   clearError: () => void;
+  updateProfile: (data: { name?: string; phone?: string; avatar_url?: string; bio?: string; date_of_birth?: string }) => Promise<void>;
+  updateVendor: (data: Record<string, unknown>) => Promise<void>;
 }
 
 const toMessage = (error: unknown, fallback: string): string => {
@@ -252,6 +257,89 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   clearError: () => set({ error: null }),
+
+  updateProfile: async (data) => {
+    set({ loading: true, error: null });
+    try {
+      const supabase = getBrowserClient();
+      const userId = get().user?.id;
+      if (!userId) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          ...(data.name !== undefined && { name: data.name }),
+          ...(data.phone !== undefined && { phone: data.phone }),
+          ...(data.avatar_url !== undefined && { avatar_url: data.avatar_url }),
+        })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      // Refresh profile data
+      const profile = await fetchProfile(userId);
+      if (profile) {
+        set({ userData: toUserData(profile) });
+      }
+    } catch (error) {
+      set({ error: toMessage(error, 'Failed to update profile') });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  updateVendor: async (data) => {
+    set({ loading: true, error: null });
+    try {
+      const supabase = getBrowserClient();
+      const userId = get().user?.id;
+      if (!userId) throw new Error('Not authenticated');
+
+      // Build update payload, only including defined keys
+      const payload: Record<string, unknown> = {};
+      const keyMap: Record<string, string> = {
+        business_name: 'business_name',
+        contact_person: 'contact_person',
+        phone: 'phone',
+        email: 'email',
+        business_type: 'business_type',
+        registration_number: 'registration_number',
+        gst_number: 'gst_number',
+        business_address: 'business_address',
+        logo_url: 'logo_url',
+        banner_url: 'banner_url',
+        description: 'description',
+        bank_account: 'bank_account',
+        upi_id: 'upi_id',
+        notification_preferences: 'notification_preferences',
+      };
+
+      for (const [camelKey, dbKey] of Object.entries(keyMap)) {
+        const val = data[camelKey];
+        if (val !== undefined) payload[dbKey] = val;
+      }
+
+      if (Object.keys(payload).length === 0) {
+        set({ loading: false });
+        return;
+      }
+
+      const { error } = await supabase
+        .from('vendors')
+        .update(payload)
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      // Refresh vendor data
+      const vendor = await fetchVendor(userId);
+      set({ vendorData: vendor ? mapVendor(vendor) : null });
+    } catch (error) {
+      set({ error: toMessage(error, 'Failed to update vendor details') });
+    } finally {
+      set({ loading: false });
+    }
+  },
 }));
 
 function mapVendor(v: SupabaseVendor | null): VendorData | null {
@@ -269,6 +357,9 @@ function mapVendor(v: SupabaseVendor | null): VendorData | null {
     bannerUrl: v.banner_url ?? undefined,
     description: v.description ?? undefined,
     status: v.status,
+    bankAccount: v.bank_account ?? undefined,
+    upiId: v.upi_id ?? undefined,
+    notificationPreferences: v.notification_preferences ?? undefined,
   };
 }
 

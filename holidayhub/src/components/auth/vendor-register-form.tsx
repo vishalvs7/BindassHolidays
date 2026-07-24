@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '@/lib/hooks/use-auth';
+import { useAuthStore } from '@/lib/store/auth.store';
 import {
   vendorStep1Schema,
   vendorStep2Schema,
@@ -40,7 +41,10 @@ export function VendorRegisterForm() {
       password: data.password,
       phone: data.phone,
     });
-    setStep(2);
+    // Only advance if no error was set by registerVendorStep1
+    if (!useAuthStore.getState().error) {
+      setStep(2);
+    }
   });
 
   const onStep2 = step2.handleSubmit(async (data) => {

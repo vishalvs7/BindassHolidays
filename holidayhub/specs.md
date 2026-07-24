@@ -174,6 +174,61 @@ This consistency keeps ground logistics clean, makes marketing laser-targeted, a
 - [ ] **Profile photo upload** — avatar for customer (`profiles.avatar_url`), logo for vendor (`vendors.logo_url`); use Supabase Storage with signed URLs
 - [ ] **Add customer dashboard structure** — create `/customer/dashboard` route with sidebar navigation linking to settings; wire header/user menu to point to settings
 
+### 🚀 Deployment (Deployed 2026-07-25)
+
+**Production URL:** https://holidayhub7-growphiles-projects.vercel.app
+
+| URL | Purpose |
+|---|---|
+| https://holidayhub7-growphiles-projects.vercel.app | Production (main) |
+| https://holidayhub-pi.vercel.app | Production (alias) |
+
+**Infra:**
+- **Hosting:** Vercel (Washington D.C. / iad1)
+- **Framework:** Next.js 15.5.21 (upgraded from 15.5.4 — CVE-2025-66478)
+- **Database:** Supabase (`crspmjiehmqofjikurkn`)
+- **Payments:** Razorpay (test mode)
+- **Email:** Brevo (growphilebusiness@gmail.com)
+- **Git Integration:** GitHub `vishalvs7/BindassHolidays` → auto-deploy on push to `main`
+- **DB Migrations pending:** `0008` (notification_preferences), `0009` (preferences), `0010` (vendor payout columns)
+
+### 📋 Next Session Plan — Manual QA Testing
+
+The app is deployed and live. Next session is for **manual end-to-end testing** of every flow with pen and paper:
+
+**Auth flows:**
+- Customer registration (with + without password)
+- Customer login
+- Vendor registration (2-step)
+- Vendor login
+- Guest checkout (no login)
+- Forgot password → reset link → new password
+- Logout
+
+**Browse & booking:**
+- Homepage load, filter by From/Vibe, search
+- Package listing page, activity listing page
+- Listing detail page, batch selection
+- Checkout flow → Razorpay payment → confirmation
+
+**Customer dashboard:**
+- Settings — Profile (save/update)
+- Settings — Notifications (toggle + persist)
+- Settings — Security (change password, delete account)
+- Settings — Privacy, Payment, Preferences, Help
+
+**Vendor dashboard:**
+- Dashboard stats (live data)
+- Listings CRUD (create, edit, delete, status toggle)
+- Bookings view + status actions (confirm, cancel, complete)
+- Settings — Business (save), Profile, Payment, Notifications, Security, Help
+
+**Cross-cutting:**
+- Mobile responsive (2-col grid, bottom sheet filter)
+- Empty states
+- Error states
+- Role-based route protection (customer can't access vendor, etc.)
+
 ---
 
-*Status: Core transaction loop, full vendor CRUD, bookings view, status actions, reviews, vendor dashboard, search, mobile responsive all COMPLETE. Customer & vendor settings fully wired to Supabase with data persistence. All settings tabs built (Profile, Notifications, Security, Privacy, Payment, Preferences, Help for customers; Business, Profile, Payment, Notifications, Security, Help for vendors). Packages search/filter is fully functional. Next: profile photo upload, customer dashboard structure.*
+*Status: Core transaction loop, full vendor CRUD, bookings view, status actions, reviews, vendor dashboard, search, mobile responsive all COMPLETE. Customer & vendor settings fully wired to Supabase with data persistence. All settings tabs built (Profile, Notifications, Security, Privacy, Payment, Preferences, Help for customers; Business, Profile, Payment, Notifications, Security, Help for vendors). Packages search/filter is fully functional. Auth flows fully wired (login, register, forgot password, reset, OAuth callback). Deployed to Vercel with Git integration. Next: manual QA testing across all flows, then profile photo upload + customer dashboard structure.*

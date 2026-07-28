@@ -52,8 +52,9 @@ export function CheckoutForm({ listing, batch, qty, gstPercent }: CheckoutProps)
   const [couponApplied, setCouponApplied] = useState(false);
   const [validatingCoupon, setValidatingCoupon] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [skipPayment, setSkipPayment] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ bookingId: string; razorpay: unknown; verified?: boolean } | null>(null);
+  const [done, setDone] = useState<{ bookingId: string; razorpay: unknown; verified?: boolean; skipped?: boolean } | null>(null);
 
   const finalTotal = couponDiscount ? total - couponDiscount : total;
   const savings = couponDiscount || 0;
@@ -121,6 +122,7 @@ export function CheckoutForm({ listing, batch, qty, gstPercent }: CheckoutProps)
             gender: t.gender || undefined,
           })),
           couponCode: couponApplied ? couponCode.trim().toUpperCase() : undefined,
+          skipPayment: skipPayment || undefined,
         }),
       });
       const data = await res.json();
@@ -159,7 +161,7 @@ export function CheckoutForm({ listing, batch, qty, gstPercent }: CheckoutProps)
           },
         });
       } else {
-        setDone({ bookingId: data.bookingId, razorpay: null });
+        setDone({ bookingId: data.bookingId, razorpay: null, skipped: skipPayment });
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
@@ -174,7 +176,7 @@ export function CheckoutForm({ listing, batch, qty, gstPercent }: CheckoutProps)
           <CheckCircle2 className="h-8 w-8" />
         </div>
         <h2 className="text-xl font-bold text-gray-900">
-          {done.verified ? "Payment Successful!" : done.razorpay ? "Payment received" : "Booking request received"}
+          {done.verified ? "Payment Successful!" : done.skipped ? "Booking Confirmed!" : done.razorpay ? "Payment received" : "Booking request received"}
         </h2>
         <p className="mt-2 text-sm text-gray-500">
           Booking ID: <span className="font-mono">{done.bookingId}</span>
@@ -182,6 +184,10 @@ export function CheckoutForm({ listing, batch, qty, gstPercent }: CheckoutProps)
         {done.verified ? (
           <p className="mt-3 rounded-lg bg-green-50 p-3 text-sm text-green-700">
             Your booking is <strong>confirmed</strong>. A confirmation email with trip details is on the way.
+          </p>
+        ) : done.skipped ? (
+          <p className="mt-3 rounded-lg bg-green-50 p-3 text-sm text-green-700">
+            Your booking is <strong>confirmed</strong> (payment skipped in test mode). A confirmation email is on the way.
           </p>
         ) : done.razorpay ? (
           <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-700">
@@ -290,9 +296,21 @@ export function CheckoutForm({ listing, batch, qty, gstPercent }: CheckoutProps)
                 Vetted Local Operator Verified · Same-Gender Room Matching Available
               </p>
             </div>
+            <label className="mt-4 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={skipPayment}
+                onChange={(e) => setSkipPayment(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              />
+              <div>
+                <p className="text-sm font-medium text-gray-900">Skip payment (test mode)</p>
+                <p className="text-xs text-gray-500">Confirm booking without paying. For testing the full flow.</p>
+              </div>
+            </label>
             <Button className="mt-4 w-full" disabled={submitting} onClick={submit}>
               {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {submitting ? "Processing…" : `Pay ₹${finalTotal.toLocaleString('en-IN')} & Book`}
+              {submitting ? "Processing…" : skipPayment ? `Book now (₹${finalTotal.toLocaleString('en-IN')} — skip payment)` : `Pay ₹${finalTotal.toLocaleString('en-IN')} & Book`}
             </Button>
             <button className="mt-3 text-sm text-gray-500 hover:text-gray-700" onClick={() => setStep(2)}>
               ← Edit traveler details

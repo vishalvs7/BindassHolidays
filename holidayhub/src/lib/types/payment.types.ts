@@ -15,6 +15,7 @@ export interface CreateOrderRequest {
     gender?: "male" | "female" | "other";
   }[];
   couponCode?: string;
+  skipPayment?: boolean;
 }
 
 export interface CreateOrderResponse {

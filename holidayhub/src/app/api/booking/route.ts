@@ -102,7 +102,8 @@ async function createBooking(req: CreateOrderRequest) {
     }).catch((e) => console.error("[booking] Welcome email failed:", e));
   }
 
-  // 4. Create booking (pending_payment) + travelers atomically
+  // 4. Create booking (pending_payment or confirmed if skipPayment) + travelers atomically
+  const initialStatus = req.skipPayment ? "confirmed" : "pending_payment";
   const { data: booking, error: bookingErr } = await supabase
     .from("bookings")
     .insert({
@@ -110,7 +111,7 @@ async function createBooking(req: CreateOrderRequest) {
       listing_id: req.listingId,
       listing_type: req.listingType,
       batch_slot_id: req.batchSlotId,
-      status: "pending_payment",
+      status: initialStatus,
       base_amount: baseAmount,
       gst_amount: gstAmount,
       total_amount: totalAmount,
@@ -178,6 +179,16 @@ export async function POST(request: NextRequest) {
     }
 
     const { bookingId, totalAmount } = await createBooking(body);
+
+    // Skip payment — booking already confirmed
+    if (body.skipPayment) {
+      return NextResponse.json({
+        ok: true,
+        bookingId,
+        razorpay: null,
+        notice: "Payment skipped. Booking confirmed.",
+      });
+    }
 
     // Razorpay integration (only if keys are configured)
     if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {

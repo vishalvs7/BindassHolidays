@@ -131,24 +131,35 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   registerCustomer: async (data) => {
     set({ loading: true, error: null });
     try {
-      const supabase = getBrowserClient();
-      const { data: authData, error } = await supabase.auth.signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          data: { name: data.name, role: 'customer', phone: data.phone ?? null },
-        },
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: data.name, email: data.email, password: data.password, phone: data.phone }),
       });
-      if (error) throw error;
-      if (authData.user) {
-        const profile = await fetchProfile(authData.user.id);
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error || "Registration failed");
+
+      // Set session in Supabase client using the tokens returned
+      if (json.accessToken && json.refreshToken) {
+        const supabase = getBrowserClient();
+        await supabase.auth.setSession({
+          access_token: json.accessToken,
+          refresh_token: json.refreshToken,
+        });
+      }
+
+      // Fetch profile and update state
+      const supabase = getBrowserClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const profile = await fetchProfile(session.user.id);
         set({
-          user: { id: authData.user.id, email: authData.user.email ?? null },
+          user: { id: session.user.id, email: session.user.email ?? null },
           userData: profile ? toUserData(profile) : null,
         });
       }
     } catch (error) {
-      set({ error: toMessage(error, 'Registration failed') });
+      set({ error: toMessage(error, "Registration failed") });
     } finally {
       set({ loading: false });
     }

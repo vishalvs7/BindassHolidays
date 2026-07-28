@@ -1,4 +1,4 @@
-export function welcomeEmail(name: string, siteUrl: string = "https://holidayhub.in"): string {
+export function welcomeEmail(name: string, email: string, siteUrl: string = "https://holidayhub.in"): string {
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
@@ -18,7 +18,7 @@ export function welcomeEmail(name: string, siteUrl: string = "https://holidayhub
           Set Your Password
         </a>
         <p style="margin:16px 0 0;color:#9ca3af;font-size:12px">
-          Use the same email you booked with: <strong>${name}</strong>
+          Use the same email you booked with: <strong>${email}</strong>
         </p>
       </td></tr>
       <tr><td style="padding:0 32px 24px;text-align:center;font-size:12px;color:#9ca3af">

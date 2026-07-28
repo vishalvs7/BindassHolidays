@@ -168,7 +168,7 @@ export default function AdminBookingsPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {[
           { label: 'Total', value: stats.total, color: 'text-gray-900' },
           { label: 'Pending', value: stats.pending, color: 'text-yellow-600' },
@@ -213,7 +213,7 @@ export default function AdminBookingsPage() {
         ))}
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>

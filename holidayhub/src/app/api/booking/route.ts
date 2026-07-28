@@ -4,6 +4,9 @@ import { randomBytes } from "crypto";
 import type { CreateOrderRequest } from "@/lib/types/payment.types";
 import { sendEmail } from "@/lib/email";
 import { welcomeEmail } from "@/lib/email/templates/welcome";
+import { bookingConfirmationEmail } from "@/lib/email/templates/booking-confirmation";
+import { generateBookingPDF } from "@/lib/pdf/generate";
+import { BookingConfirmationPDF } from "@/lib/pdf/booking-confirmation";
 import { validateCoupon } from "@/lib/coupon/validate";
 import { couponStore } from "@/lib/coupon/store";
 
@@ -21,16 +24,12 @@ function serviceClient() {
 async function createBooking(req: CreateOrderRequest) {
   const supabase = serviceClient();
 
-  // 1. Validate the slot + listing + availability
-  const { data: slot, error: slotErr } = await supabase
-    .from("batch_slots")
-    .select("id, total_slots, booked_slots, price_override, batch_date_id")
-    .eq("id", req.batchSlotId)
-    .single();
+  // 1. Atomically reserve slots — prevents overbooking via race conditions
+  const { data: slotRows, error: slotErr } = await supabase
+    .rpc("reserve_slot", { p_slot_id: req.batchSlotId, p_qty: req.qty });
 
-  if (slotErr || !slot) throw new Error("Selected slot not found.");
-  const available = slot.total_slots - slot.booked_slots;
-  if (available < req.qty) throw new Error("Not enough slots available for this batch.");
+  const slot = slotRows?.[0];
+  if (slotErr || !slot) throw new Error("Not enough slots available for this batch.");
 
   // 2. Resolve base price from the unified listing
   const { data: listing, error: listingErr } = await supabase
@@ -87,7 +86,7 @@ async function createBooking(req: CreateOrderRequest) {
 
     // ensure profile row exists
     await supabase.from("profiles").upsert(
-      { id: userId, full_name: req.contact.name, email: req.contact.email, role: "customer", phone: req.contact.phone },
+      { id: userId, name: req.contact.name, email: req.contact.email, role: "customer", phone: req.contact.phone },
       { onConflict: "id" }
     );
   }
@@ -98,7 +97,7 @@ async function createBooking(req: CreateOrderRequest) {
     sendEmail({
       to: [{ email: req.contact.email, name: req.contact.name }],
       subject: "Welcome to HolidayHub! Set your password",
-      htmlContent: welcomeEmail(req.contact.name, siteUrl),
+      htmlContent: welcomeEmail(req.contact.name, req.contact.email, siteUrl),
     }).catch((e) => console.error("[booking] Welcome email failed:", e));
   }
 
@@ -136,14 +135,7 @@ async function createBooking(req: CreateOrderRequest) {
   const { error: travErr } = await supabase.from("booking_travelers").insert(travelers);
   if (travErr) throw new Error("Failed to save travelers.");
 
-  // 5. Hold the slot (increment booked count) — the 10-min moat
-  const { error: holdErr } = await supabase
-    .from("batch_slots")
-    .update({ booked_slots: slot.booked_slots + req.qty })
-    .eq("id", req.batchSlotId);
-  if (holdErr) throw new Error("Failed to hold slots.");
-
-  // 6. Track coupon usage
+  // 5. Track coupon usage
   if (couponInfo) {
     const coupon = couponStore.getByCode(couponInfo.code);
     if (coupon) {
@@ -182,6 +174,78 @@ export async function POST(request: NextRequest) {
 
     // Skip payment — booking already confirmed
     if (body.skipPayment) {
+      // Send confirmation email with PDF (non-blocking)
+      const supabase = serviceClient();
+      (async () => {
+        try {
+          const { data: booking } = await supabase
+            .from("bookings")
+            .select("*, listing:listings!listing_id(title), batch_slot:batch_slots!batch_slot_id(batch_date_id)")
+            .eq("id", bookingId)
+            .single();
+
+          if (booking) {
+            const { data: travelers } = await supabase
+              .from("booking_travelers")
+              .select("full_name, age, gender, phone")
+              .eq("booking_id", bookingId);
+
+            const { data: batchDate } = await supabase
+              .from("batch_dates")
+              .select("depart_at, return_at")
+              .eq("id", booking.batch_slot?.batch_date_id)
+              .single();
+
+            const tList = (travelers ?? []).map((t: any) => ({
+              full_name: t.full_name,
+              age: t.age,
+              gender: t.gender ?? "other",
+              phone: t.phone ?? undefined,
+            }));
+
+            const pdfBuffer = await generateBookingPDF(
+              BookingConfirmationPDF({
+                bookingId: booking.id,
+                contactName: booking.contact_name,
+                contactEmail: booking.contact_email,
+                contactPhone: booking.contact_phone,
+                listingTitle: booking.listing?.title ?? "—",
+                listingType: booking.listing_type,
+                departAt: batchDate?.depart_at ?? "",
+                returnAt: batchDate?.return_at ?? "",
+                travelers: tList,
+                baseAmount: Number(booking.base_amount),
+                gstAmount: Number(booking.gst_amount),
+                gstPercent: Number(booking.gst_percent),
+                totalAmount: Number(booking.total_amount),
+                status: "confirmed",
+              })
+            );
+
+            await sendEmail({
+              to: [{ email: booking.contact_email, name: booking.contact_name }],
+              subject: `Booking Confirmed — ${booking.listing?.title ?? "Trip"}`,
+              htmlContent: bookingConfirmationEmail({
+                contactName: booking.contact_name,
+                listingTitle: booking.listing?.title ?? "—",
+                departAt: batchDate?.depart_at ?? "",
+                returnAt: batchDate?.return_at ?? "",
+                travelers: tList,
+                totalAmount: Number(booking.total_amount),
+                bookingId: booking.id,
+              }),
+              attachments: [{
+                name: `booking-${booking.id.slice(0, 8)}.pdf`,
+                content: pdfBuffer.toString("base64"),
+                contentType: "application/pdf",
+              }],
+            });
+          }
+        } catch (e) {
+          console.error("[booking] Confirmation email failed:", e);
+        }
+      })();
+
       return NextResponse.json({
         ok: true,
         bookingId,

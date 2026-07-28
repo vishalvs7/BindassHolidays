@@ -169,7 +169,7 @@ export default function AdminCouponsPage() {
           <p className="mt-1 text-sm text-gray-500">Create your first promo code.</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+        <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50 text-left">

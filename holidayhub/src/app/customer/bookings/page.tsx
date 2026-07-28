@@ -358,7 +358,7 @@ export default function CustomerBookingsPage() {
           </Link>
           
           <a 
-            href="/help" 
+            href="/contact" 
             className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-primary-200 transition"
           >
             <div className="flex items-center space-x-3">

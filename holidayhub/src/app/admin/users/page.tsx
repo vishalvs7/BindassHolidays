@@ -153,7 +153,7 @@ export default function AdminUsersPage() {
         />
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>

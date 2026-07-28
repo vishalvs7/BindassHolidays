@@ -405,7 +405,7 @@ export default function VendorDashboardPage() {
                 <h2 className="text-xl font-bold text-gray-900">Top Listings</h2>
                 <p className="text-gray-600 text-sm mt-1">Most viewed listings</p>
               </div>
-              <Link href="/vendor/listings" className="text-primary-600 hover:text-primary-700 text-sm font-medium flex items-center">
+              <Link href="/vendor/listings/packages" className="text-primary-600 hover:text-primary-700 text-sm font-medium flex items-center">
                 Manage <ArrowUpRight size={16} className="ml-1" />
               </Link>
             </div>

@@ -65,7 +65,7 @@ function ListingHero({ listing }: { listing: ListingView }) {
   const cover = listing.coverImage ?? listing.gallery[0];
   return (
     <div className="overflow-hidden rounded-2xl bg-white">
-      <div className="relative h-80 bg-gradient-to-r from-primary-500 to-purple-600">
+      <div className="relative h-48 sm:h-64 lg:h-80 bg-gradient-to-r from-primary-500 to-purple-600">
         {cover ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={cover} alt={listing.title} className="h-full w-full object-cover" />

@@ -41,7 +41,7 @@ export default function VendorLayout({
       if (!user) {
         router.replace('/login');
       } else if (userData?.role !== 'vendor') {
-        router.replace(userData?.role === 'customer' ? '/customer/dashboard' : '/admin/dashboard');
+        router.replace(userData?.role === 'customer' ? '/customer/bookings' : '/admin/dashboard');
       }
     }
   }, [user, userData, loading, initialized, router]);
@@ -64,37 +64,37 @@ export default function VendorLayout({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <Link href="/" className="flex items-center space-x-3">
+              <Link href="/" className="flex items-center space-x-2">
                 <div className="h-8 w-8 bg-purple-600 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold">BH</span>
                 </div>
-                <span className="text-xl font-bold text-gray-900">Bindass Holiday</span>
-                <span className="text-sm text-purple-600 bg-purple-50 px-2 py-1 rounded">Vendor</span>
+                <span className="hidden sm:inline text-xl font-bold text-gray-900">Bindass Holiday</span>
+                <span className="text-xs sm:text-sm text-purple-600 bg-purple-50 px-2 py-1 rounded">Vendor</span>
               </Link>
             </div>
             
-            <div className="flex items-center space-x-6">
-              <Link href="/" className="flex items-center space-x-2 text-gray-600 hover:text-purple-600">
+            <div className="flex items-center gap-2 sm:gap-6">
+              <Link href="/" className="hidden sm:flex items-center space-x-2 text-gray-600 hover:text-purple-600">
                 <Home size={20} />
                 <span>Home</span>
               </Link>
               
-              <div className="flex items-center space-x-3">
+              <div className="hidden md:flex items-center space-x-3">
                 <div className="h-10 w-10 bg-purple-100 rounded-full flex items-center justify-center">
                   <Building2 size={20} className="text-purple-600" />
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-medium text-gray-900">{userData?.businessName}</p>
+                  <p className="text-sm font-medium text-gray-900 truncate max-w-[150px]">{userData?.businessName}</p>
                   <p className="text-xs text-gray-500">{userData?.name} • Vendor</p>
                 </div>
               </div>
               
               <button
                 onClick={() => logout()}
-                className="flex items-center space-x-2 px-4 py-2 text-sm bg-red-50 text-red-700 hover:bg-red-100 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 text-sm bg-red-50 text-red-700 hover:bg-red-100 rounded-lg transition-colors"
               >
                 <LogOut size={16} />
-                <span>Logout</span>
+                <span className="hidden sm:inline">Logout</span>
               </button>
             </div>
           </div>

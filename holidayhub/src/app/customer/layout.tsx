@@ -53,24 +53,24 @@ export default function CustomerLayout({
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center space-x-3 min-w-0">
+              <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
                 <User className="h-6 w-6 text-primary-600" />
               </div>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-xl font-bold text-gray-900 truncate">
                   Welcome back, {userData?.name || 'Traveler'}!
                 </h1>
-                <p className="text-sm text-gray-600">{userData?.email}</p>
+                <p className="text-sm text-gray-600 truncate">{userData?.email}</p>
               </div>
             </div>
             <button
               onClick={logout}
-              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
+              className="flex items-center gap-1.5 text-gray-600 hover:text-gray-900 flex-shrink-0"
             >
               <LogOut className="h-5 w-5" />
-              <span>Logout</span>
+              <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
         </div>

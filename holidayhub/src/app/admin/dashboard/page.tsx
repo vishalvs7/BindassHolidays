@@ -262,7 +262,7 @@ export default function AdminDashboardPage() {
       {stats?.listingsByStatus && stats.listingsByStatus.length > 0 && (
         <div className="bg-white border border-gray-200 rounded-xl p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-4">Listings by Status</h2>
-          <div className="flex gap-6">
+          <div className="flex flex-wrap gap-6">
             {stats.listingsByStatus.map((s) => (
               <div key={s.status} className="flex-1">
                 <div className="flex justify-between text-sm mb-1">

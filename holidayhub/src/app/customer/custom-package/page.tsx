@@ -124,7 +124,7 @@ export default function CustomerCustomPackagePage() {
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
                 </div>
-                <div className="flex space-x-4 mt-3">
+                <div className="flex flex-wrap gap-2 mt-3">
                   {['₹10k-20k', '₹20k-30k', '₹30k-50k', '₹50k+'].map(range => (
                     <button
                       key={range}

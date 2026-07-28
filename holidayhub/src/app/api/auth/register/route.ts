@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     // Upsert profile row
     await supabase.from("profiles").upsert(
-      { id: signup.user.id, full_name: name, email, role: "customer", phone: phone ?? null },
+      { id: signup.user.id, name: name, email, role: "customer", phone: phone ?? null },
       { onConflict: "id" }
     );
 

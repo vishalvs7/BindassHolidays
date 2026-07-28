@@ -41,7 +41,7 @@ export function CheckoutForm({ listing, batch, qty, gstPercent }: CheckoutProps)
   const total = base + gst;
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [lead, setLead] = useState({ name: "", email: "", phone: "", password: "" });
+  const [lead, setLead] = useState({ name: "", email: "", phone: "" });
   const [travelers, setTravelers] = useState<TravelerInput[]>(
     Array.from({ length: qty }, () => ({ full_name: "", age: "", phone: "", gender: "" }))
   );
@@ -120,7 +120,6 @@ export function CheckoutForm({ listing, batch, qty, gstPercent }: CheckoutProps)
             phone: t.phone || undefined,
             gender: t.gender || undefined,
           })),
-          registerPassword: lead.password ? lead.password : undefined,
           couponCode: couponApplied ? couponCode.trim().toUpperCase() : undefined,
         }),
       });
@@ -226,12 +225,8 @@ export function CheckoutForm({ listing, batch, qty, gstPercent }: CheckoutProps)
               <Input id="email" type="email" value={lead.email} onChange={(e) => setLead({ ...lead, email: e.target.value })} placeholder="jane@email.com" />
             </div>
             <div className="sm:col-span-2">
-              <Label htmlFor="password">
-                Create a password <span className="text-gray-400">(optional — skip to checkout as guest)</span>
-              </Label>
-              <Input id="password" type="password" value={lead.password} onChange={(e) => setLead({ ...lead, password: e.target.value })} placeholder="Min 6 characters" />
-              <p className="mt-1 text-xs text-gray-400">
-                Add a password to create your HolidayHub account automatically. Leave blank to book without an account.
+              <p className="text-xs text-gray-400">
+                An account will be created automatically. You can set your password later via the link we&apos;ll email you.
               </p>
             </div>
           </div>

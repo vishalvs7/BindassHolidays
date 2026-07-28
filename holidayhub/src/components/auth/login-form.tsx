@@ -150,6 +150,13 @@ export function LoginForm({ initialTab = 'login' }: { initialTab?: Mode }) {
           >
             {loading ? 'Signing in…' : 'Sign In'}
           </button>
+
+          <p className="text-center text-sm text-gray-500">
+            Booked without setting a password?{' '}
+            <Link href="/forgot-password" className="text-primary-600 font-medium hover:text-primary-700">
+              Set it here
+            </Link>
+          </p>
         </form>
       ) : (
         <form onSubmit={onRegister} className="space-y-4">

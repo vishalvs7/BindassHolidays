@@ -1,4 +1,4 @@
-export function welcomeEmail(name: string): string {
+export function welcomeEmail(name: string, siteUrl: string = "https://holidayhub.in"): string {
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
@@ -9,17 +9,20 @@ export function welcomeEmail(name: string): string {
         <h1 style="margin:0;font-size:24px;color:#1e1b4b">Welcome to HolidayHub!</h1>
         <p style="margin:12px 0 0;color:#6b7280;font-size:14px;line-height:1.6">
           Hi <strong>${name}</strong>,<br>
-          You're all set. Start exploring weekend trips curated for the Indian working professional.
+          Your account has been created. Set your password below to access your bookings and manage your trips.
         </p>
       </td></tr>
       <tr><td style="padding:24px 32px;text-align:center">
-        <a href="https://holidayhub.in/packages"
+        <a href="${siteUrl}/forgot-password"
            style="display:inline-block;padding:12px 32px;background:#7c3aed;color:#fff;border-radius:12px;text-decoration:none;font-size:14px;font-weight:600">
-          Browse Trips
+          Set Your Password
         </a>
+        <p style="margin:16px 0 0;color:#9ca3af;font-size:12px">
+          Use the same email you booked with: <strong>${name}</strong>
+        </p>
       </td></tr>
       <tr><td style="padding:0 32px 24px;text-align:center;font-size:12px;color:#9ca3af">
-        Depart Friday night · Return Monday morning · Zero leaves needed
+        After setting your password, log in to view all your bookings.
       </td></tr>
     </table>
   </td></tr></table>

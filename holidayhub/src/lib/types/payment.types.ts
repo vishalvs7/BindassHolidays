@@ -14,8 +14,6 @@ export interface CreateOrderRequest {
     phone?: string;
     gender?: "male" | "female" | "other";
   }[];
-  // optional: register the lead as a customer (guest checkout if omitted)
-  registerPassword?: string;
   couponCode?: string;
 }
 

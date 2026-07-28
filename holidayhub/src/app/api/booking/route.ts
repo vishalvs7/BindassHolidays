@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { randomBytes } from "crypto";
 import type { CreateOrderRequest } from "@/lib/types/payment.types";
 import { sendEmail } from "@/lib/email";
 import { welcomeEmail } from "@/lib/email/templates/welcome";
@@ -59,27 +60,45 @@ async function createBooking(req: CreateOrderRequest) {
     totalAmount = result.finalAmount!;
   }
 
-  // 3. Optionally register the lead as a customer (guest if no password)
+  // 3. Ensure the lead has a Supabase auth account (auto-create if first booking)
   let userId: string | null = null;
-  if (req.registerPassword && req.registerPassword.length >= 6) {
+  let isNewUser = false;
+
+  // Check if a user already exists with this email
+  const { data: existingUsers } = await supabase.auth.admin.listUsers();
+  const existingUser = existingUsers?.users?.find(
+    (u) => u.email?.toLowerCase() === req.contact.email.toLowerCase()
+  );
+
+  if (existingUser) {
+    userId = existingUser.id;
+  } else {
+    // Create new user with a random temporary password (they'll set their own later)
+    const tempPassword = `tmp_${randomBytes(24).toString("hex")}`;
     const { data: signup, error: signupErr } = await supabase.auth.admin.createUser({
       email: req.contact.email,
-      password: req.registerPassword,
+      password: tempPassword,
       email_confirm: true,
       user_metadata: { name: req.contact.name, role: "customer", phone: req.contact.phone },
     });
     if (signupErr) throw new Error("Could not create account: " + signupErr.message);
     userId = signup.user?.id ?? null;
+    isNewUser = true;
+
     // ensure profile row exists
     await supabase.from("profiles").upsert(
       { id: userId, full_name: req.contact.name, email: req.contact.email, role: "customer", phone: req.contact.phone },
       { onConflict: "id" }
     );
-    // send welcome email (non-blocking)
+  }
+
+  // Send welcome email with "Set your password" link (non-blocking)
+  if (isNewUser) {
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
     sendEmail({
       to: [{ email: req.contact.email, name: req.contact.name }],
-      subject: "Welcome to HolidayHub!",
-      htmlContent: welcomeEmail(req.contact.name),
+      subject: "Welcome to HolidayHub! Set your password",
+      htmlContent: welcomeEmail(req.contact.name, siteUrl),
     }).catch((e) => console.error("[booking] Welcome email failed:", e));
   }
 

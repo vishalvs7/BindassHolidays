@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { Suspense, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { User, Heart, X, Menu } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/use-auth';
 
@@ -65,17 +66,112 @@ function UserButton() {
   );
 }
 
-export function Header() {
-  const [mobileOpen, setMobileOpen] = useState(false);
+function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    if (mobileOpen) {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (open) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
     }
     return () => { document.body.style.overflow = ''; };
-  }, [mobileOpen]);
+  }, [open]);
+
+  if (!mounted || !open) return null;
+
+  return createPortal(
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 9999 }}
+      className="md:hidden"
+    >
+      <div
+        style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }}
+        onClick={onClose}
+      />
+      <nav
+        style={{
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: '288px',
+          background: '#fff',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflowY: 'auto',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px 20px' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              border: 'none',
+              background: '#f3f4f6',
+              cursor: 'pointer',
+            }}
+          >
+            <X size={18} color="#6b7280" />
+          </button>
+        </div>
+        <div style={{ padding: '0 20px 24px' }}>
+          <MobileNavLinks onLinkClick={onClose} />
+        </div>
+      </nav>
+    </div>,
+    document.body
+  );
+}
+
+function MobileNavLinks({ onLinkClick }: { onLinkClick?: () => void }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  function isActive(item: typeof NAV_ITEMS[number]) {
+    if (pathname !== '/packages') return false;
+    const activeVertical = searchParams.get('vertical');
+    return item.vertical === activeVertical || (!item.vertical && !activeVertical);
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      {NAV_ITEMS.map((item) => (
+        <Link
+          key={item.href}
+          href={item.href}
+          onClick={onLinkClick}
+          style={{
+            display: 'block',
+            padding: '12px 16px',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: 600,
+            textDecoration: 'none',
+            background: isActive(item) ? '#7c3aed' : 'transparent',
+            color: isActive(item) ? '#fff' : '#374151',
+          }}
+        >
+          {item.label}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+export function Header() {
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
@@ -107,62 +203,7 @@ export function Header() {
         </div>
       </div>
 
-      {mobileOpen && (
-        <div className="fixed inset-0 z-[60] md:hidden">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setMobileOpen(false)}
-          />
-
-          <nav className="absolute right-0 top-0 flex h-full w-72 flex-col bg-white shadow-xl">
-            <div className="flex items-center justify-end border-b border-gray-100 px-5 py-4">
-              <button
-                type="button"
-                onClick={() => setMobileOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-5 py-4">
-              <Suspense fallback={null}>
-                <MobileNavLinks onLinkClick={() => setMobileOpen(false)} />
-              </Suspense>
-            </div>
-          </nav>
-        </div>
-      )}
+      <MobileMenu open={mobileOpen} onClose={() => setMobileOpen(false)} />
     </header>
-  );
-}
-
-function MobileNavLinks({ onLinkClick }: { onLinkClick?: () => void }) {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  function isActive(item: typeof NAV_ITEMS[number]) {
-    if (pathname !== '/packages') return false;
-    const activeVertical = searchParams.get('vertical');
-    return item.vertical === activeVertical || (!item.vertical && !activeVertical);
-  }
-
-  return (
-    <div className="flex flex-col gap-1">
-      {NAV_ITEMS.map((item) => (
-        <Link
-          key={item.href}
-          href={item.href}
-          onClick={onLinkClick}
-          className={`rounded-xl px-4 py-3 text-sm font-semibold transition-colors ${
-            isActive(item)
-              ? 'bg-primary-600 text-white'
-              : 'text-gray-700 hover:bg-gray-100'
-          }`}
-        >
-          {item.label}
-        </Link>
-      ))}
-    </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { getBrowserClient } from '@/lib/supabase/client';
-import { Loader2, AlertCircle, Users as UsersIcon, Mail, Calendar, Search } from 'lucide-react';
+import { Loader2, AlertCircle, Users as UsersIcon, Mail, Calendar, Search, Trash2, Shield, ShieldOff } from 'lucide-react';
 
 interface UserRow {
   id: string;
@@ -18,6 +18,8 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -54,6 +56,46 @@ export default function AdminUsersPage() {
     );
   }, [users, search]);
 
+  const stats = {
+    total: users.length,
+    customers: users.filter(u => u.role === 'customer').length,
+    vendors: users.filter(u => u.role === 'vendor').length,
+    admins: users.filter(u => u.role === 'admin').length,
+  };
+
+  const changeRole = async (userId: string, newRole: string) => {
+    setActionLoading(userId);
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, role: newRole }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to update role.');
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update role.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const deleteUser = async (userId: string) => {
+    setActionLoading(userId);
+    try {
+      const res = await fetch(`/api/admin/users?userId=${userId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to delete user.');
+      setUsers(prev => prev.filter(u => u.id !== userId));
+      setConfirmDelete(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete user.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-gray-400">
@@ -66,6 +108,7 @@ export default function AdminUsersPage() {
     return (
       <div className="flex items-center gap-2 rounded-xl bg-red-50 p-4 text-sm text-red-700">
         <AlertCircle className="h-4 w-4" /> {error}
+        <button onClick={() => setError(null)} className="ml-auto text-red-700 underline text-sm">Dismiss</button>
       </div>
     );
   }
@@ -83,6 +126,20 @@ export default function AdminUsersPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
         <p className="mt-1 text-gray-500">{filtered.length} of {users.length} user{users.length !== 1 ? 's' : ''}</p>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Users', value: stats.total, color: 'text-gray-900' },
+          { label: 'Customers', value: stats.customers, color: 'text-blue-600' },
+          { label: 'Vendors', value: stats.vendors, color: 'text-purple-600' },
+          { label: 'Admins', value: stats.admins, color: 'text-red-600' },
+        ].map((s) => (
+          <div key={s.label} className="bg-white border border-gray-200 rounded-xl p-4">
+            <p className="text-sm text-gray-600">{s.label}</p>
+            <p className={`text-xl font-bold mt-1 ${s.color}`}>{s.value}</p>
+          </div>
+        ))}
       </div>
 
       <div className="relative max-w-md">
@@ -105,6 +162,7 @@ export default function AdminUsersPage() {
               <th className="px-5 py-3.5 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
               <th className="px-5 py-3.5 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
               <th className="px-5 py-3.5 text-left text-xs font-medium text-gray-500 uppercase">Joined</th>
+              <th className="px-5 py-3.5 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -134,6 +192,55 @@ export default function AdminUsersPage() {
                     <Calendar size={14} />
                     {new Date(u.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </span>
+                </td>
+                <td className="px-5 py-4">
+                  {confirmDelete === u.id ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-red-600 font-medium">Delete?</span>
+                      <button
+                        onClick={() => deleteUser(u.id)}
+                        disabled={actionLoading === u.id}
+                        className="text-xs bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700 disabled:opacity-50"
+                      >
+                        {actionLoading === u.id ? '...' : 'Yes'}
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete(null)}
+                        className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded hover:bg-gray-300"
+                      >
+                        No
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      {u.role !== 'admin' ? (
+                        <button
+                          onClick={() => changeRole(u.id, 'admin')}
+                          disabled={actionLoading === u.id}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                          title="Make admin"
+                        >
+                          <Shield size={15} />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => changeRole(u.id, 'customer')}
+                          disabled={actionLoading === u.id}
+                          className="p-1.5 rounded-lg text-red-400 hover:text-gray-600 hover:bg-gray-100 transition"
+                          title="Remove admin"
+                        >
+                          <ShieldOff size={15} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setConfirmDelete(u.id)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                        title="Delete user"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}

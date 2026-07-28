@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { getBrowserClient } from '@/lib/supabase/client';
-import { Loader2, AlertCircle, Package, Search, Eye } from 'lucide-react';
+import { Loader2, AlertCircle, Package, Search, Eye, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 
 interface ListingRow {
@@ -23,50 +23,87 @@ export default function AdminPackagesPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const supabase = getBrowserClient();
-        const { data: l, error: le } = await supabase
-          .from('listings')
-          .select('id, title, type, status, vertical, vendor_id, price, rating, created_at')
-          .order('created_at', { ascending: false });
-        if (le) throw le;
+  const fetchListings = async () => {
+    setLoading(true);
+    try {
+      const supabase = getBrowserClient();
+      const { data: l, error: le } = await supabase
+        .from('listings')
+        .select('id, title, type, status, vertical, vendor_id, price, rating, created_at')
+        .order('created_at', { ascending: false });
+      if (le) throw le;
 
-        const vendorIds = [...new Set((l ?? []).map((r: any) => r.vendor_id).filter(Boolean))];
-        const vendorMap = new Map<string, string>();
-        if (vendorIds.length > 0) {
-          const { data: vendors } = await supabase
-            .from('vendors')
-            .select('id, business_name')
-            .in('id', vendorIds);
-          (vendors ?? []).forEach((v: any) => vendorMap.set(v.id, v.business_name ?? '—'));
-        }
-
-        setListings((l ?? []).map((r: any) => ({
-          id: r.id,
-          title: r.title,
-          type: r.type,
-          status: r.status,
-          vertical: r.vertical,
-          vendor_name: vendorMap.get(r.vendor_id) ?? '—',
-          price: Number(r.price),
-          rating: Number(r.rating ?? 0),
-          created_at: r.created_at,
-        })));
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to load listings.');
-      } finally {
-        setLoading(false);
+      const vendorIds = [...new Set((l ?? []).map((r: any) => r.vendor_id).filter(Boolean))];
+      const vendorMap = new Map<string, string>();
+      if (vendorIds.length > 0) {
+        const { data: vendors } = await supabase
+          .from('vendors')
+          .select('id, business_name')
+          .in('id', vendorIds);
+        (vendors ?? []).forEach((v: any) => vendorMap.set(v.id, v.business_name ?? '—'));
       }
-    })();
-  }, []);
+
+      setListings((l ?? []).map((r: any) => ({
+        id: r.id,
+        title: r.title,
+        type: r.type,
+        status: r.status,
+        vertical: r.vertical,
+        vendor_name: vendorMap.get(r.vendor_id) ?? '—',
+        price: Number(r.price),
+        rating: Number(r.rating ?? 0),
+        created_at: r.created_at,
+      })));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load listings.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchListings(); }, []);
+
+  const toggleStatus = async (listingId: string) => {
+    setActionLoading(listingId);
+    try {
+      const res = await fetch('/api/admin/listings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listingId, action: 'toggle' }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to toggle status.');
+      setListings(prev => prev.map(l => l.id === listingId ? { ...l, status: data.status } : l));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to toggle status.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const deleteListing = async (listingId: string) => {
+    setActionLoading(listingId);
+    try {
+      const res = await fetch(`/api/admin/listings?listingId=${listingId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to delete listing.');
+      setListings(prev => prev.filter(l => l.id !== listingId));
+      setConfirmDelete(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete listing.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   const filtered = useMemo(() => {
     let result = listings;
     if (typeFilter !== 'all') result = result.filter(l => l.type === typeFilter);
+    if (statusFilter !== 'all') result = result.filter(l => l.status === statusFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(l =>
@@ -75,7 +112,7 @@ export default function AdminPackagesPage() {
       );
     }
     return result;
-  }, [listings, typeFilter, search]);
+  }, [listings, typeFilter, statusFilter, search]);
 
   const stats = {
     total: listings.length,
@@ -97,15 +134,18 @@ export default function AdminPackagesPage() {
     return (
       <div className="flex items-center gap-2 rounded-xl bg-red-50 p-4 text-sm text-red-700">
         <AlertCircle className="h-4 w-4" /> {error}
+        <button onClick={() => setError(null)} className="ml-auto text-red-700 underline text-sm">Dismiss</button>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">All Listings</h1>
-        <p className="mt-1 text-gray-500">{filtered.length} of {listings.length} listing{listings.length !== 1 ? 's' : ''}</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">All Listings</h1>
+          <p className="mt-1 text-gray-500">{filtered.length} of {listings.length} listing{listings.length !== 1 ? 's' : ''}</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -150,6 +190,20 @@ export default function AdminPackagesPage() {
             {s === 'all' ? 'All Types' : s + 's'}
           </button>
         ))}
+        <span className="border-l border-gray-300 mx-1" />
+        {['all', 'published', 'draft'].map((s) => (
+          <button
+            key={s}
+            onClick={() => setStatusFilter(s)}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium capitalize border transition ${
+              statusFilter === s
+                ? 'bg-gray-800 text-white border-gray-800'
+                : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
+            }`}
+          >
+            {s === 'all' ? 'All Status' : s}
+          </button>
+        ))}
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -168,7 +222,7 @@ export default function AdminPackagesPage() {
           <tbody className="divide-y divide-gray-200">
             {filtered.map((l) => (
               <tr key={l.id} className="hover:bg-gray-50">
-                <td className="px-5 py-4 font-medium text-gray-900">{l.title}</td>
+                <td className="px-5 py-4 font-medium text-gray-900 max-w-[250px] truncate">{l.title}</td>
                 <td className="px-5 py-4">
                   <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                     l.type === 'package' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
@@ -187,14 +241,51 @@ export default function AdminPackagesPage() {
                     {l.status}
                   </span>
                 </td>
-                <td className="px-5 py-4 text-sm text-gray-600">{l.rating > 0 ? l.rating : '—'}</td>
+                <td className="px-5 py-4 text-sm text-gray-600">{l.rating > 0 ? `★ ${l.rating}` : '—'}</td>
                 <td className="px-5 py-4">
-                  <Link
-                    href={`/listings/${l.id}`}
-                    className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-medium"
-                  >
-                    <Eye size={14} /> View
-                  </Link>
+                  {confirmDelete === l.id ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-red-600 font-medium">Delete?</span>
+                      <button
+                        onClick={() => deleteListing(l.id)}
+                        disabled={actionLoading === l.id}
+                        className="text-xs bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700 disabled:opacity-50"
+                      >
+                        {actionLoading === l.id ? '...' : 'Yes'}
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete(null)}
+                        className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded hover:bg-gray-300"
+                      >
+                        No
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <Link
+                        href={`/listings/${l.id}`}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-primary-600 hover:bg-primary-50 transition"
+                        title="View listing"
+                      >
+                        <Eye size={15} />
+                      </Link>
+                      <button
+                        onClick={() => toggleStatus(l.id)}
+                        disabled={actionLoading === l.id}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition disabled:opacity-50"
+                        title={l.status === 'published' ? 'Unpublish' : 'Publish'}
+                      >
+                        {l.status === 'published' ? <ToggleRight size={15} /> : <ToggleLeft size={15} />}
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete(l.id)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                        title="Delete listing"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}

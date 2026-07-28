@@ -71,7 +71,7 @@ This consistency keeps ground logistics clean, makes marketing laser-targeted, a
 
 #### Phase 3: The Transaction Loop (The Developer's Moat)
 - **The Checkout:** The user logs in via a quick authentication layout and hits the checkout page.
-- **The Concurrence Hold:** The moment they hit checkout, a Supabase database constraint places a temporary `reserved_at` timestamp on that slot for **10 minutes**.
+- **The Concurrence Hold:** The moment they hit checkout, an atomic `reserve_slot()` RPC function places a reservation on that slot — preventing overbooking via race conditions.
 - **The Mobile-First Pay:** They complete the transaction via **Razorpay UPI Intent** on their phone in seconds.
 - **The Webhook Verification:** Razorpay fires a backend `payment.captured` webhook. The code performs a final verification check against the database transaction, marks the booking as officially **Confirmed**, and releases the service-fee GST receipt splits.
 
@@ -91,15 +91,16 @@ This consistency keeps ground logistics clean, makes marketing laser-targeted, a
 
 ---
 
-## 📌 Build Status & Progress (Last updated: 2026-07-21)
+## 📌 Build Status & Progress (Last updated: 2026-07-29)
 
 > **This is the resume point for the next dev session.** Read this section to know exactly where to start.
 
 ### Tech stack (current reality)
-- **Next.js 15.5.4** (downgraded from 16 — Next 16's native runtime caused SIGBUS/silent death in this sandbox), React 19.2.1, Tailwind v3, Shadcn-style UI, Supabase (`@supabase/ssr` + `@supabase/supabase-js`), Zustand, React Hook Form + Zod v4, **Razorpay v2.9.5** (lazy/optional — keys NOT set in `.env.local`). Firebase fully removed.
+- **Next.js 15.5.21**, React 19.2.1, Tailwind v3, Shadcn-style UI, Supabase (`@supabase/ssr` + `@supabase/supabase-js`), Zustand, React Hook Form + Zod v4, **Razorpay v2.9.8** (lazy/optional — keys NOT set in `.env.local`). Firebase fully removed.
 - **Verification method:** `tsc --noEmit` (clean) + `next build` (passes). `next dev` CANNOT run in this sandbox (background process gets killed) — do not rely on it; use build + live Supabase queries.
 - `.env.local` holds Supabase anon + service-role keys. `.env*` gitignored. Supabase project ref `crspmjiehmqofjikurkn`.
 - **Font:** `Nova Round` via `next/font/google` (replaced Poppins). All headings `uppercase`.
+- **Brevo** email service (growphilebusiness@gmail.com). Auto-approval on registration (`email_confirm: true` via admin API).
 
 ### Database migrations applied & verified live
 - `0001_auth_foundation` + `0002_fix_admin_rls` — `profiles`, `vendors`, `is_admin()`.
@@ -108,59 +109,83 @@ This consistency keeps ground logistics clean, makes marketing laser-targeted, a
 - `0005_unify_listings` — single **`listings`** table (type enum `package`|`activity`), dropped packages/activities, re-pointed batch_dates + bookings to listing_id/listing_type, recreated RLS.
 - `0006_fix_slot_policy` — recreated `batch_slots_vendor_all` policy on `listing_id`.
 - `0007_vendor_update_booking` — vendor `UPDATE` policy on `bookings` (via batch_slots → batch_dates → listings join).
+- `0011_atomic_slot_reservation` — `reserve_slot(p_slot_id, p_qty)` RPC function for atomic slot reservation (prevents overbooking race conditions).
 - **IMPORTANT:** `bookings` has NO `booking_count` column — never select it. Booking count is computed client-side by counting rows.
+- **IMPORTANT:** `profiles` table uses column `name` (NOT `full_name`).
 
 ### Catalog decision (locked)
 - ONE `listings` table with `type` enum. `/packages` & `/activities` are **filtered URL views** over `listings` (set `type` filter). Single vendor form with a type toggle. Do NOT reintroduce separate tables.
 
 ### Completed features
-1. **Auth** — customers browse WITHOUT login; shared login → role redirect. Guest checkout (contact + optional password auto-creates customer). Vendor = 2-step. Admin = placeholders. Google = placeholder.
-2. **Dynamic browse** — `src/config/tabs.ts` (From/Vibe taxonomy), `src/lib/supabase/listing.ts` (`getListing(id)`, `getListings(filters)` over `listings`), `components/browse/packages-grid.tsx` (2-col mobile / 3-col desktop), `components/browse/packages-filter-sidebar.tsx` (From/Vibe/Duration/Price URL filters). Home has dual tab rows → `/packages?cat=...`.
-3. **Search & filtering** — `getListings()` supports `q` keyword search (title, summary, destination, tags). `components/browse/search-bar.tsx` with purple search icon. `/packages?q=...` param wired on packages & activities pages.
-4. **Unified product page** — `src/app/(browse)/listings/[id]/page.tsx` + `components/browse/listing-booking-widget.tsx` (type-aware). `/packages/[id]` & `/activities/[id]` = redirects to `/listings/[id]`.
-5. **Guest checkout** — `src/app/checkout/page.tsx` + `components/checkout/checkout-form.tsx` (3 steps: contact+optional password, per-traveler details, pay), GST calc, trust badge.
-6. **Booking API** — `src/app/api/booking/route.ts`: validates slot availability, holds slots, optional customer registration, Razorpay lazy (graceful if no keys). Stores `listing_id` + `listing_type`. Verified live (booking + travelers insert).
-7. **Vendor listing management (FULL CRUD)** —
+1. **Auth** — customers browse WITHOUT login; shared login → role redirect. Guest checkout auto-creates Supabase auth account with temp password + welcome email ("Set Your Password" link). Vendor = 2-step. Admin = placeholders. Google = placeholder. Registration uses `email_confirm: true` via admin API (auto-approved).
+2. **Auto-account creation on checkout** — Every booking auto-creates Supabase auth user with temp password, sends welcome email with "Set Your Password" link. No password field in checkout form. Registration API (`/api/auth/register`) uses service role with `email_confirm: true` and auto-logs in user.
+3. **Dynamic browse** — `src/config/tabs.ts` (From/Vibe taxonomy), `src/lib/supabase/listing.ts` (`getListing(id)`, `getListings(filters)` over `listings`), `components/browse/packages-grid.tsx` (2-col mobile / 3-col desktop), `components/browse/packages-filter-sidebar.tsx` (From/Vibe/Duration/Price URL filters). Home has dual tab rows → `/packages?cat=...`.
+4. **Search & filtering** — `getListings()` supports `q` keyword search (title, summary, destination, tags). `components/browse/search-bar.tsx` with purple search icon. `/packages?q=...` param wired on packages & activities pages.
+5. **Unified product page** — `src/app/(browse)/listings/[id]/page.tsx` + `components/browse/listing-booking-widget.tsx` (type-aware). `/packages/[id]` & `/activities/[id]` = redirects to `/listings/[id]`. Responsive hero image (`h-48 sm:h-64 lg:h-80`).
+6. **Guest checkout** — `src/app/checkout/page.tsx` + `components/checkout/checkout-form.tsx` (3 steps: contact, per-traveler details, pay), GST calc, trust badge. Skip payment toggle for test mode (`skipPayment: true` → booking created as `confirmed` directly).
+7. **Booking API** — `src/app/api/booking/route.ts`: atomic slot reservation via `reserve_slot()` RPC, auto-account creation, optional Razorpay (graceful if no keys). Stores `listing_id` + `listing_type`. Sends confirmation email + PDF for skipPayment bookings.
+8. **Vendor listing management (FULL CRUD)** —
    - `components/vendor/listing-form.tsx` — unified create/edit form (all sections; supports `initialId` for edit: prefills via browser client, updates + reconciles batches by delete/reinsert). Verified live (insert + update).
    - Routes: `/vendor/listings/new`, `/packages/new`, `/activities/new` (preset type); `/vendor/listings/{packages,activities}/edit/[id]` (edit); bare `edit/` pages redirect to list.
-   - `components/vendor/vendor-listings-table.tsx` (used by `/vendor/listings/packages` & `/activities`) — live fetch by vendor_id+type, status toggle (Draft/Published), edit, delete, view. Verified live (update/list/delete).
-8. **Vendor bookings view** —
+   - `components/vendor/vendor-listings-table.tsx` (used by `/vendor/listings/packages` & `activities`) — live fetch by vendor_id+type, status toggle (Draft/Published), edit, delete, view. Verified live (update/list/delete).
+9. **Vendor bookings view** —
    - `components/vendor/vendor-bookings.tsx` — fetch vendor's listing IDs → bookings via `listing_id` (+ optional `type` filter); summary cards (total/pending/confirmed/revenue), status filter pills, expandable rows with lead contact + **traveler manifest** from `booking_travelers`.
    - Routes: `/vendor/bookings`, `/vendor/bookings/packages`, `/vendor/bookings/activities`.
-9. **Booking status actions** —
-   - `0007_vendor_update_booking` migration adds vendor update RLS policy.
-   - `src/app/api/booking/[id]/route.ts` PATCH endpoint with validated status transitions (pending_payment → confirmed/cancelled, confirmed → completed/cancelled).
-   - Action buttons in expanded booking row (Confirm / Mark Completed / Cancel) with loading states.
-10. **Reviews on listing page** —
+10. **Booking status actions** —
+    - `0007_vendor_update_booking` migration adds vendor update RLS policy.
+    - `src/app/api/booking/[id]/route.ts` PATCH endpoint with validated status transitions (pending_payment → confirmed/cancelled, confirmed → completed/cancelled).
+    - Action buttons in expanded booking row (Confirm / Mark Completed / Cancel) with loading states.
+11. **Reviews on listing page** —
     - `components/browse/listing-reviews.tsx` — fetches & displays reviews by listing_id, star ratings, comment list, average rating.
     - Submit form with interactive star selector, name field (guests) or auto-name (logged-in), optimistic UI update.
     - Added to `src/app/(browse)/listings/[id]/page.tsx`.
-11. **Vendor dashboard** — replaced all hardcoded placeholder stats with live Supabase queries:
+12. **Vendor dashboard** — replaced all hardcoded placeholder stats with live Supabase queries:
     - Stats cards: total revenue, active bookings, total listings, average rating.
     - Recent bookings table from actual `bookings` table.
     - Top listings section with booking counts & revenue.
     - Loading spinner, error state, empty states.
-12. **Navbar** — 3 centered nav items: Explore, Retreat (wellness), Solo Travel (solo_explorer). Uppercase, no icons, active state highlight.
-13. **Mobile responsive** —
-    - Filter sidebar: hidden on mobile, opens as bottom-sheet drawer via `components/browse/mobile-filter-drawer.tsx`.
+13. **Navbar** — 3 centered nav items: Explore, Retreat (wellness), Solo Travel (solo_explorer). Uppercase, no icons, active state highlight. BH logo only (no brand text). User icon in circle for logged-in users. Mobile hamburger menu via createPortal.
+14. **Admin dashboard (FULL)** —
+    - Live stats: total users, vendors, listings, bookings, revenue.
+    - Status bars: listings by status, vendor approval status.
+    - Recent bookings + recent users tables.
+    - Routes: `/admin/dashboard`, `/admin/users`, `/admin/bookings`, `/admin/packages`, `/admin/vendors`, `/admin/coupons`, `/admin/settings`.
+    - Users: role change, delete with confirmation.
+    - Bookings: status change via PATCH API.
+    - Packages: toggle publish/draft, delete.
+    - Vendors: approve/reject.
+    - Coupons: full CRUD.
+    - Settings: integration status indicators, localStorage persistence.
+15. **Mobile responsive** —
+    - Admin layout: mobile sidebar toggle (hamburger → slide-in from left).
+    - Vendor layout: responsive top nav (logo text hides on mobile, user info hides, logout compresses to icon).
+    - Customer layout: responsive header (truncates welcome text, logout hides text on mobile).
+    - Filter sidebar: hidden on mobile, opens as bottom-sheet drawer via `components/browse/mobile-filter-drawer.tsx` (with body scroll lock).
     - Grid: 2 columns mobile, 3 columns desktop.
     - Content max-width: 1500px via Tailwind container config.
-14. **Empty states across the app** —
+    - Admin tables: `overflow-x-auto` for horizontal scroll on mobile.
+    - Bookings stat grid: `md:grid-cols-3 lg:grid-cols-6`.
+16. **Empty states across the app** —
     - `loading.tsx` + `error.tsx` for `(browse)` route group.
     - Cart checkout: empty cart guard with CTA.
     - Vendor payments: empty transactions state.
     - Vendor bookings, package grid, reviews all have empty states.
-15. **UI primitives** — `components/ui/card.tsx`, `components/ui/badge.tsx` created. `src/types/razorpay.d.ts` ambient decl.
-16. **Config** — `next.config.ts` `outputFileTracingRoot: import.meta.dirname`; `eslint.config.mjs` FlatCompat + overrides; Tailwind container center + 1500px max-width.
+17. **UI primitives** — `components/ui/card.tsx`, `components/ui/badge.tsx` created. `src/types/razorpay.d.ts` ambient decl.
+18. **Config** — `next.config.ts` `outputFileTracingRoot: import.meta.dirname`; `eslint.config.mjs` FlatCompat + overrides; Tailwind container center + 1500px max-width.
+19. **Dead link cleanup** — Created `/privacy` and `/terms` placeholder pages. Fixed `/help` → `/contact`, `/vendor/listings` → `/vendor/listings/packages`. Fixed broken `/customer/dashboard` redirects → `/customer/bookings`.
 
 ### Known gaps / blocked
 - Razorpay keys NOT set → payment shows "pending_payment, configure Razorpay" (by design).
 - **No Razorpay webhook** — no `payment.captured` endpoint to flip booking to `confirmed`.
 - **No refund/cancellation logic** — cancelling just updates DB status; doesn't release slots or process refunds.
-- **Admin dashboard** — all placeholders / ComingSoon stubs.
 - **Vendor dashboard** notifications panel shows empty state (no real notification system).
 - Automated manifest PDF / WhatsApp / Thursday cron (Phase 4) not built.
 - `package-booking-widget.tsx` is now unused (superseded by `listing-booking-widget.tsx`); safe to delete later.
+- **Hardcoded mock data** in vendor payments, vendor analytics, customer bookings pages.
+- **Non-functional buttons** in vendor dashboard (Export Report, Set New Goals, Mark all as read), vendor settings (Start Verification, Enable 2FA), customer settings (Sign out of all devices, Enable 2FA).
+- **No rate limiting** on booking or coupon APIs.
+- **In-memory coupon store** resets on serverless cold starts.
+- **No abandoned booking cleanup** — pending_payment bookings hold slots indefinitely.
 
 ### 🚀 Resume checklist for next session
 - [x] **Add `updateProfile` to auth store** — create a Zustand action that updates the `profiles` table (name, phone, avatar_url) and refreshes local `userData`
@@ -172,9 +197,8 @@ This consistency keeps ground logistics clean, makes marketing laser-targeted, a
 - [x] **Build remaining Customer Settings tabs** — Privacy (data export/delete), Payment (saved cards/UPI stub), Preferences (currency, language, theme), Help (FAQ links, support ticket stub)
 - [x] **Build remaining Vendor Settings tabs** — Profile (contact photo, description), Payment (payout details, commission view), Notifications (email/SMS toggles), Security (password change, 2FA)
 - [ ] **Profile photo upload** — avatar for customer (`profiles.avatar_url`), logo for vendor (`vendors.logo_url`); use Supabase Storage with signed URLs
-- [ ] **Add customer dashboard structure** — create `/customer/dashboard` route with sidebar navigation linking to settings; wire header/user menu to point to settings
 
-### 🚀 Deployment (Deployed 2026-07-25)
+### 🚀 Deployment
 
 **Production URL:** https://holidayhub7-growphiles-projects.vercel.app
 
@@ -185,50 +209,35 @@ This consistency keeps ground logistics clean, makes marketing laser-targeted, a
 
 **Infra:**
 - **Hosting:** Vercel (Washington D.C. / iad1)
-- **Framework:** Next.js 15.5.21 (upgraded from 15.5.4 — CVE-2025-66478)
+- **Framework:** Next.js 15.5.21
 - **Database:** Supabase (`crspmjiehmqofjikurkn`)
-- **Payments:** Razorpay (test mode)
+- **Payments:** Razorpay (test mode — not configured, skip payment toggle for testing)
 - **Email:** Brevo (growphilebusiness@gmail.com)
 - **Git Integration:** GitHub `vishalvs7/BindassHolidays` → auto-deploy on push to `main`
-- **DB Migrations pending:** `0008` (notification_preferences), `0009` (preferences), `0010` (vendor payout columns)
+- **DB Migrations pending:** `0008` (notification_preferences), `0009` (preferences), `0010` (vendor payout columns), `0011` (atomic slot reservation — needs manual run in Supabase SQL Editor)
 
-### 📋 Next Session Plan — Manual QA Testing
+### 📋 Session Summary — 2026-07-29
 
-The app is deployed and live. Next session is for **manual end-to-end testing** of every flow with pen and paper:
+**Completed today:**
+1. **Auto-account creation on checkout** — removed password field, every booking auto-creates Supabase auth user with temp password, sends welcome email with "Set Your Password" link
+2. **Register button fix** — removed `confirmPassword` from `customerRegisterSchema`
+3. **Email auto-approval** — created `/api/auth/register` server route using admin client with `email_confirm: true`, user auto-logged in after registration
+4. **Navbar redesign** — removed "Bindass Holiday" text (kept BH logo), replaced login/signup buttons with user icon in circle, mobile hamburger menu sliding from right via `createPortal`
+5. **Full admin dashboard** — Users (role change, delete), Bookings (status change), Listings (toggle publish/draft, delete), Vendors (approve/reject), Coupons (full CRUD), Settings (integration status)
+6. **Skip payment toggle** — checkbox "Skip payment (test mode)" on checkout step 3, sends `skipPayment: true` to API which creates booking as `confirmed` directly
+7. **Vercel deployment fix** — removed stale root `package.json`/`package-lock.json`, set root directory to `holidayhub`
+8. **Mobile responsiveness** — admin layout mobile sidebar, vendor/customer responsive headers, admin table overflow-x-auto, bookings stat grid responsive, mobile filter drawer body scroll lock
+9. **E2E booking flow audit** — found and fixed 16 issues including critical profile column mismatch (`full_name` → `name`), welcome email showing name instead of email, missing confirmation email for skipPayment bookings
+10. **Slot race condition fix** — created `reserve_slot()` atomic RPC function, replaced read-then-write with atomic conditional UPDATE
+11. **Broken redirect fixes** — `/customer/dashboard` → `/customer/bookings` in admin and vendor layouts
+12. **Dead link cleanup** — created `/privacy` and `/terms` pages, fixed `/help` → `/contact`, `/vendor/listings` → `/vendor/listings/packages`
+13. **UI fixes** — listing hero image responsive, custom package budget buttons wrap, mobile filter drawer scroll lock
 
-**Auth flows:**
-- Customer registration (with + without password)
-- Customer login
-- Vendor registration (2-step)
-- Vendor login
-- Guest checkout (no login)
-- Forgot password → reset link → new password
-- Logout
-
-**Browse & booking:**
-- Homepage load, filter by From/Vibe, search
-- Package listing page, activity listing page
-- Listing detail page, batch selection
-- Checkout flow → Razorpay payment → confirmation
-
-**Customer dashboard:**
-- Settings — Profile (save/update)
-- Settings — Notifications (toggle + persist)
-- Settings — Security (change password, delete account)
-- Settings — Privacy, Payment, Preferences, Help
-
-**Vendor dashboard:**
-- Dashboard stats (live data)
-- Listings CRUD (create, edit, delete, status toggle)
-- Bookings view + status actions (confirm, cancel, complete)
-- Settings — Business (save), Profile, Payment, Notifications, Security, Help
-
-**Cross-cutting:**
-- Mobile responsive (2-col grid, bottom sheet filter)
-- Empty states
-- Error states
-- Role-based route protection (customer can't access vendor, etc.)
+**DB migration to run:**
+```sql
+-- Run in Supabase SQL Editor: supabase/migrations/0011_atomic_slot_reservation.sql
+```
 
 ---
 
-*Status: Core transaction loop, full vendor CRUD, bookings view, status actions, reviews, vendor dashboard, search, mobile responsive all COMPLETE. Customer & vendor settings fully wired to Supabase with data persistence. All settings tabs built (Profile, Notifications, Security, Privacy, Payment, Preferences, Help for customers; Business, Profile, Payment, Notifications, Security, Help for vendors). Packages search/filter is fully functional. Auth flows fully wired (login, register, forgot password, reset, OAuth callback). Deployed to Vercel with Git integration. Next: manual QA testing across all flows, then profile photo upload + customer dashboard structure.*
+*Status: Core transaction loop complete with atomic slot reservation. Auto-account creation on checkout. Full admin dashboard. Mobile responsive across all layouts. Skip payment test mode. All critical booking flow bugs fixed (profile column, welcome email, confirmation emails). Deployed to Vercel with Git integration. Next: manual QA testing across all flows, then profile photo upload.*
